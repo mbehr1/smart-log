@@ -4,6 +4,9 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import TelemetryReporter from 'vscode-extension-telemetry';
+
+let reporter: TelemetryReporter;
 
 const smartLogLanguageId: string = "smart-log";
 
@@ -24,7 +27,21 @@ interface SelectedTimeData {
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('mbehr1.smart-log activated.');
+	const extensionId = 'mbehr1.smart-log';
+	const extension = vscode.extensions.getExtension(extensionId);
 
+	if (extension) {
+		const extensionVersion = extension.packageJSON.extensionVersion;
+
+		// the aik is not really sec_ret. but lets avoid bo_ts finding it too easy:
+		const strKE = 'ZjJlMDA4NTQtNmU5NC00ZDVlLTkxNDAtOGFiNmIzNTllODBi';
+		const strK = Buffer.from(strKE, "base64").toString();
+		reporter = new TelemetryReporter(extensionId, extensionVersion, strK);
+		context.subscriptions.push(reporter);
+		reporter?.sendTelemetryEvent('activate');
+	} else {
+		console.log(`${extensionId}: not found as extension!`);
+	}
 	// check whether large file support (mbehr1.vsc-lfs) is available
 	// background see: vscode issue #27100, feature request #31078
 	const extVscLfs = vscode.extensions.getExtension('mbehr1.vsc-lfs');
@@ -291,6 +308,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				setTimeout(() => {
 					this.updateData(data);
 				}, 1000);
+				reporter?.sendTelemetryEvent("open file", undefined, { 'nrFileConfigs': this._fileConfigs ? this._fileConfigs.length : 0 });
 			}
 
 			if (this._documents.size > 0) {

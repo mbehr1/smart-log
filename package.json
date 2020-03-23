@@ -2,7 +2,7 @@
 	"name": "smart-log",
 	"displayName": "Smart-Log",
 	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "0.9.0",
+	"version": "0.9.1",
 	"license": "CC BY-NC-SA 4.0",
 	"publisher": "mbehr1",
 	"author": {
@@ -233,5 +233,8 @@
 		"mocha": "^7.0.1",
 		"typescript": "^3.7.5",
 		"vscode-test": "^1.3.0"
+	},
+	"dependencies": {
+		"vscode-extension-telemetry": "^0.1.2"
 	}
 }

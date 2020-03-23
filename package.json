@@ -9,7 +9,13 @@
 		"name": "Matthias Behr",
 		"email": "mbehr+smartlog@mcbehr.de"
 	},
-	"repository": "github:mbehr1/smart-log",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/mbehr1/smart-log.git"
+	},
+	"bugs": {
+		"url": "https://github.com/mbehr1/smart-log/issues"
+	},
 	"engines": {
 		"vscode": "^1.43.0"
 	},

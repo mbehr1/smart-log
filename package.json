@@ -1,0 +1,231 @@
+{
+	"name": "smart-log",
+	"displayName": "Smart-Log",
+	"description": "Provides analysis and visualization features for text based log files.",
+	"version": "0.9.0",
+	"license": "CC BY-NC-SA 4.0",
+	"publisher": "mbehr1",
+	"author": {
+		"name": "Matthias Behr",
+		"email": "mbehr+smartlog@mcbehr.de"
+	},
+	"repository": "github:mbehr1/smart-log",
+	"engines": {
+		"vscode": "^1.43.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"*"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"configuration": [
+			{
+				"title": "Smart-Log",
+				"properties": {
+					"smart-log.timeRegex": {
+						"type": "string",
+						"description": "Regular expression used to identify the time for a line of the logs. This can be overwritten by timeRegex setting inside each fileConfig. Needs to have at least 6 captures (year, month, date, hour, min, sec) can have a 7th (ms) or only 1 capture (time string that Date() accepts).",
+						"default": "^([0-2][0-9]|[0-2][0-9][0-9][0-9])\\-([0-1][0-9])\\-([0-3][0-9]) ([0-2][0-9])\\:([0-5][0-9])\\:([0-5][0-9]),([0-9][0-9][0-9])"
+					},
+					"smart-log.decorations": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"title": "decoration",
+							"properties": {
+								"id": {
+									"type": "string",
+									"description": "Identifier of this decoration for later reference e.g. in events."
+								},
+								"renderOptions": {
+									"type": "object",
+									"description": "Render options see vs code API DecorationRenderOptions."
+								}
+							}
+						},
+						"default": [
+							{
+								"id": "error",
+								"renderOptions": {
+									"borderWidth": "1px",
+									"borderStyle": "solid",
+									"overviewRulerColor": "red",
+									"overviewRulerLane": 7,
+									"light": {
+										"borderColor": "red"
+									},
+									"dark": {
+										"borderColor": "red"
+									}
+								}
+							},
+							{
+								"id": "warning",
+								"renderOptions": {
+									"borderWidth": "1px",
+									"borderStyle": "dotted",
+									"overviewRulerColor": "orange",
+									"overviewRulerLane": 4,
+									"light": {
+										"borderColor": "orange"
+									},
+									"dark": {
+										"borderColor": "orange"
+									}
+								}
+							},
+							{
+								"id": "note",
+								"renderOptions": {
+									"borderWidth": "1px",
+									"borderStyle": "dotted",
+									"overviewRulerColor": "blue",
+									"overviewRulerLane": 1,
+									"light": {
+										"borderColor": "blue"
+									},
+									"dark": {
+										"borderColor": "blue"
+									}
+								}
+							}
+						]
+					},
+					"smart-log.fileConfigs": {
+						"type": "array",
+						"items": {
+							"type": "object",
+							"title": "fileConfig",
+							"properties": {
+								"name": {
+									"type": "string",
+									"description": "Name to identify the type of file."
+								},
+								"identifyRegex": {
+									"type": "string",
+									"description": "Regexp to identify this file type. Will be searched in full document. The first matching file type is used."
+								},
+								"timeRegex": {
+									"type": "string",
+									"description": "Regexp used to identify the time for a line of the logs. If provided it overwrittes the smart-log.timeRegex setting."
+								},
+								"events": {
+									"type": "array",
+									"items": {
+										"type": "object",
+										"title": "eventConfig",
+										"properties": {
+											"regex": {
+												"type": "string",
+												"description": "Regexp to identify this event. Events are searched line by line."
+											},
+											"label": {
+												"type": "string",
+												"description": "Label of this event. Can contain {x} format expressions that are replaced by regex x.th captured regex match[x]. If empty defaults to the match[0]"
+											},
+											"level": {
+												"type": "integer",
+												"description": "Indent level (1-based) of this event. Level 1 events are the upmost ones. Level 0 wont be added to tree-view but can be used for decorations.",
+												"default": 0
+											},
+											"decorationId": {
+												"type": "string",
+												"description": "Identifier of the decoration to use. Defaults to none."
+											}
+										}
+									}
+								}
+							}
+						},
+						"default": [
+							{
+								"name": "syslog",
+								"identifyRegex": "\\s(.*)\\[(\\d*)\\]:",
+								"timeRegex": "^(.*\\s[0-2][0-9]\\:[0-5][0-9]\\:[0-9][0-9])\\s",
+								"events": [
+									{
+										"label": "error",
+										"regex": "error",
+										"decorationId": "error"
+									},
+									{
+										"label": "root: {1}",
+										"level": 1,
+										"regex": "\\(root\\)(.*)",
+										"decorationId": "warning"
+									}
+								]
+							}
+						],
+						"description": "File specific configurations. For details see (todo)"
+					}
+				}
+			}
+		],
+		"commands": [
+			{
+				"command": "smart-log.adjustTime",
+				"title": "adjust time..."
+			}
+		],
+		"menus": {
+			"editor/context": [
+				{
+					"group": "1_modification",
+					"command": "smart-log.adjustTime",
+					"when": "editorLangId == smart-log"
+				}
+			]
+		},
+		"languages": [
+			{
+				"id": "smart-log",
+				"extensions": [
+					".log",
+					".txt"
+				]
+			}
+		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "smart-log",
+					"title": "Smart-Log",
+					"icon": "./media/smart-log.svg"
+				}
+			]
+		},
+		"views": {
+			"smart-log": [
+				{
+					"id": "smartLogEventsExplorer",
+					"name": "events explorer"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -p ./",
+		"lint": "eslint src --ext ts",
+		"watch": "tsc -watch -p ./",
+		"pretest": "npm run compile && npm run lint",
+		"test": "node ./out/test/runTest.js"
+	},
+	"devDependencies": {
+		"@types/glob": "^7.1.1",
+		"@types/mocha": "^7.0.1",
+		"@types/node": "^12.11.7",
+		"@types/vscode": "^1.43.0",
+		"eslint": "^6.8.0",
+		"@typescript-eslint/parser": "^2.18.0",
+		"@typescript-eslint/eslint-plugin": "^2.18.0",
+		"glob": "^7.1.6",
+		"mocha": "^7.0.1",
+		"typescript": "^3.7.5",
+		"vscode-test": "^1.3.0"
+	}
+}

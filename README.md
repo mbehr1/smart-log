@@ -50,7 +50,7 @@ This extension contributes the following settings:
 Any and all test, code or feedback contributions are welcome.
 Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull request to make this extension work better for all.
 
-Donations are welcome! (Contact me for commercial use or different [license](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)).
+[![Donations](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=2ZNMJP5P43QQN&source=url) are welcome! (Contact me for commercial use or different [license](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)).
 
 ## Planned features
 

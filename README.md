@@ -6,16 +6,18 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
 
 **Note:** It works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.vsc-lfs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.vsc-lfs) to handle large log files (few hundred MBs).
 
+**Note:** The **time-sync** feature works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.dlt-logs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.dlt-logs) for DLT (diagnostic log and trace) files.
+
 
 ## Features
 
-- Configurable **event tree-view** (todo picture)
-  - Helps quickly to understand the structure or to highlight events (errors/warnings,...)
+- Configurable **event tree-view** (todo picture):
+  - Helps quickly to understand the structure or to highlight events (errors/warnings,...).
   - Quickly jump to the event by selecting the item in the tree-view.
-- Configurable **decorations** (todo picture)
-- **Time sync** feature (todo movie...)
+- Configurable **decorations** (todo picture).
+- **Time sync** feature (todo movie...):
   - Detects time for each line.
-  - An offset for the full file can be set via context menu item *adjust time...*;
+  - An offset for the full file can be set via context menu item *adjust time...*.
   - Posts events of the selected time to other documents/plugins. (See ... <todo>).
   - Allows to "synchronize" this time with other visible documents from all plugins that support "onDidChangeSelectedTime" events. 
 - Allows configuration of **multiple file types** (see settings smart-log.fileConfigs).

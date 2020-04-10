@@ -4,7 +4,7 @@
 
 This Visual Studio Code(tm) extension adds **analysis** and **visualization** features for log files and should ease debugging especially of complex systems where multiple log files need to be considered at the same time.
 
-![Smart-Log in action](./images/smart-log_1.gif)
+![Smart-Log in action](https://github.com/mbehr1/smart-log/raw/master/images/smart-log_1.gif)
 
 **Note:** It works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.vsc-lfs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.vsc-lfs) to handle large log files (few hundred MBs).
 

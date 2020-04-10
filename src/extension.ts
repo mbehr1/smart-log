@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import TelemetryReporter from 'vscode-extension-telemetry';
+import * as d3 from 'd3-time-format';
 
 let reporter: TelemetryReporter;
 
@@ -81,6 +82,7 @@ interface DataPerDocument {
 	identifiedFileConfig?: any
 	cachedTimes?: Array<Date>; // per line one date/time
 	timeRegex?: RegExp; // from file config or default
+	timeFormat?: string;
 	timeAdjustMs?: number; // adjust in ms
 };
 export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vscode.Disposable {
@@ -99,6 +101,8 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 	private _defaultTimeRegex = new RegExp('^([0-2][0-9]|[0-2][0-9][0-9][0-9])\-([0-1][0-9])\-([0-3][0-9]) ([0-2][0-9])\:([0-5][0-9])\:([0-5][0-9]),([0-9][0-9][0-9])');
 	private _timeRegex = vscode.workspace.getConfiguration().get<string>("smart-log.timeRegex") ?
 		new RegExp(<string>(vscode.workspace.getConfiguration().get<string>("smart-log.timeRegex"))) : this._defaultTimeRegex;
+	private _timeFormat = vscode.workspace.getConfiguration().get<string>("smart-log.timeFormat");
+
 
 	private _onDidChangeTreeData: vscode.EventEmitter<EventNode | null> = new vscode.EventEmitter<EventNode | null>();
 	readonly onDidChangeTreeData: vscode.Event<EventNode | null> = this._onDidChangeTreeData.event;
@@ -118,10 +122,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				this._fileConfigs = vscode.workspace.getConfiguration().get<Array<object>>("smart-log.fileConfigs");
 				this._timeRegex = vscode.workspace.getConfiguration().get<string>("smart-log.timeRegex") ?
 					new RegExp(<string>(vscode.workspace.getConfiguration().get<string>("smart-log.timeRegex"))) : this._defaultTimeRegex;
+				this._timeFormat = vscode.workspace.getConfiguration().get<string>("smart-log.timeFormat");
 				console.log(` #fileConfigs=${this._fileConfigs?.length}`);
 				this._documents.forEach((data) => {
 					data.identifiedFileConfig = undefined; // reset here to let config changes apply
 					data.timeRegex = undefined;
+					data.timeFormat = undefined;
 					data.cachedTimes = undefined;
 					this.updateData(data);
 				});
@@ -191,8 +197,10 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					// determine time:
 					const time = this.provideTimeByData(data, line);
 					// post time update...
-					console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
-					this._onDidChangeSelectedTime.fire({ time: time, uri: data.doc.uri });
+					if (time.valueOf() > 0) {
+						console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
+						this._onDidChangeSelectedTime.fire({ time: time, uri: data.doc.uri });
+					}
 				}
 			}
 		}));
@@ -383,6 +391,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				console.log("smart-log.provideTimeByData has no timeRegex!");
 				return new Date(0);
 			}
+
+			let d3TimeParser = null;
+			if (data.timeFormat) {
+				d3TimeParser = d3.timeParse(data.timeFormat);
+			}
+
 			// we reset the times here in any case:
 			data.cachedTimes = new Array<Date>();
 
@@ -398,9 +412,20 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						const ms: number = regRes[7] ? +regRes[7] : 0;
 						let date = new Date(year, +regRes[2] - 1, +regRes[3], +regRes[4], +regRes[5], +regRes[6], ms);
 						data.cachedTimes.push(date);
-					} else if (regRes.length === 2) {
-						let date = new Date(regRes[1]);
-						data.cachedTimes.push(date);
+					} else if (regRes.length === 2) { // one complete date string
+						let date: Date | null = null;
+						if (d3TimeParser) {
+							try {
+								const parsedTime = d3TimeParser(regRes[1]);
+								// console.log(`got parsedTime ${parsedTime}`);
+								date = <Date>parsedTime;
+							} catch (error) {
+								console.log(`got error ${error}`);
+							}
+						} else {
+							date = new Date(regRes[1]);
+						}
+						data.cachedTimes.push(date ? date : new Date(0));
 					}
 				} else {
 					// use the one from prev. line
@@ -484,11 +509,16 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 		if (identifiedFileConfig) {
 
-			if (identifiedFileConfig.timeRegex) {
+			if ("timeRegex" in identifiedFileConfig) {
 				data.timeRegex = new RegExp(<string>identifiedFileConfig.timeRegex);
 			} else {
 				console.log(" using default timeRegex");
 				data.timeRegex = this._timeRegex;
+			}
+			if ("timeFormat" in identifiedFileConfig) {
+				data.timeFormat = identifiedFileConfig.timeFormat;
+			} else {
+				data.timeFormat = this._timeFormat;
 			}
 
 			const events: any | undefined = identifiedFileConfig.events;

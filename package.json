@@ -2,7 +2,7 @@
 	"name": "smart-log",
 	"displayName": "Smart-Log",
 	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "0.9.1",
+	"version": "1.0.0",
 	"license": "CC BY-NC-SA 4.0",
 	"publisher": "mbehr1",
 	"author": {
@@ -35,6 +35,10 @@
 						"type": "string",
 						"description": "Regular expression used to identify the time for a line of the logs. This can be overwritten by timeRegex setting inside each fileConfig. Needs to have at least 6 captures (year, month, date, hour, min, sec) can have a 7th (ms) or only 1 capture (time string that Date() accepts).",
 						"default": "^([0-2][0-9]|[0-2][0-9][0-9][0-9])\\-([0-1][0-9])\\-([0-3][0-9]) ([0-2][0-9])\\:([0-5][0-9])\\:([0-5][0-9]),([0-9][0-9][0-9])"
+					},
+					"smart-log.timeFormat": {
+						"type": "string",
+						"description": "Optional time format specifier (details see d3-time-format). If this is provided the timeRegex has to capture one expression that will be parsed according to this specifier. Example '%d/%b/%Y:%H:%M:%S %Z'. If not provided the default Date() constructor will be used."
 					},
 					"smart-log.decorations": {
 						"type": "array",
@@ -118,6 +122,10 @@
 									"type": "string",
 									"description": "Regexp used to identify the time for a line of the logs. If provided it overwrittes the smart-log.timeRegex setting."
 								},
+								"timeFormat": {
+									"type": "string",
+									"description": "Optional time format specifier (details see d3-time-format). If this is provided the timeRegex has to capture one expression that will be parsed according to this specifier. Example '%d/%b/%Y:%H:%M:%S %Z'. If not provided the default Date() constructor will be used."
+								},
 								"events": {
 									"type": "array",
 									"items": {
@@ -147,6 +155,26 @@
 							}
 						},
 						"default": [
+							{
+								"name": "common log format",
+								"identifyRegex": "HTTP/",
+								"timeRegex": "^\\S+ \\S+ \\S+ \\[([^\\]]+)",
+								"timeFormat": "%d/%b/%Y:%H:%M:%S %Z",
+								"events": [
+									{
+										"level": 1,
+										"label": "error {2} {1}",
+										"decorationId": "error",
+										"regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (5[0-9]{2}) "
+									},
+									{
+										"level": 2,
+										"label": "{2} {1}",
+										"decorationId": "warning",
+										"regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (4[0-9]{2}) "
+									}
+								]
+							},
 							{
 								"name": "syslog",
 								"identifyRegex": "\\s(.*)\\[(\\d*)\\]:",
@@ -235,6 +263,8 @@
 		"vscode-test": "^1.3.0"
 	},
 	"dependencies": {
+		"@types/d3-time-format": "^2.1.1",
+		"d3-time-format": "^2.2.3",
 		"vscode-extension-telemetry": "^0.1.2"
 	}
 }

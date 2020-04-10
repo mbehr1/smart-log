@@ -4,6 +4,8 @@
 
 This Visual Studio Code(tm) extension adds **analysis** and **visualization** features for log files and should ease debugging especially of complex systems where multiple log files need to be considered at the same time.
 
+![Smart-Log in action](./images/smart-log_1.gif)
+
 **Note:** It works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.vsc-lfs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.vsc-lfs) to handle large log files (few hundred MBs).
 
 **Note:** The **time-sync** feature works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.dlt-logs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.dlt-logs) for DLT (diagnostic log and trace) files.
@@ -22,14 +24,6 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
   - Allows to "synchronize" this time with other visible documents from all plugins that support "onDidChangeSelectedTime" events. 
 - Allows configuration of **multiple file types** (see settings smart-log.fileConfigs).
 
-<!-- 
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
--->
-
 ## Requirements
 
 To open large log files please consider installing "vsc-lfs" extension.
@@ -38,6 +32,7 @@ To open large log files please consider installing "vsc-lfs" extension.
 This extension contributes the following settings:
 
 * `smart-log.timeRegex`: Regular expression (regex) to identify the time of a log line.
+* `smart-log.timeFormat`: Optional time format specifier (details see config example).
 * `smart-log.decorations`: Definition of the decoration types supported for events.
 * `smart-log.fileConfigs`: Definition of the configuration per file type.
 
@@ -56,10 +51,11 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 
 ## Planned features
 
+* add filtering based on events (remove all but the events)
 * automatic timezone detection
-* improved time regex / parsing
 * time sync auto-synchronization
 * change "smart-log" file type automatically to sub-types
+* change file type back to e.g. Log or Plain text on if no config is found.
 * add event icon support in tree view
 * add event support to modify parent title
 * add decoration for time-sync
@@ -68,6 +64,14 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 
 See [Changelog](./CHANGELOG.md)
 
+## Third-party Content
+
+This project leverages the following third party content.
+
+d3-time-format (2.2.3)
+ - License: BSD-Clause-3 https://github.com/d3/d3-time-format/blob/master/LICENSE
+ - Source: https://github.com/d3/d3-time-format
+ 
 <!-- 
 **Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
 

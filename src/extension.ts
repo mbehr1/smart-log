@@ -3,6 +3,7 @@
 */
 
 import * as vscode from 'vscode';
+import * as util from './util';
 import * as path from 'path';
 import TelemetryReporter from 'vscode-extension-telemetry';
 import * as d3 from 'd3-time-format';
@@ -10,16 +11,6 @@ import * as d3 from 'd3-time-format';
 let reporter: TelemetryReporter;
 
 const smartLogLanguageId: string = "smart-log";
-
-// adapted from https://stackoverflow.com/questions/20070158/string-format-not-work-in-typescript
-function stringFormat(str: string, args: RegExpExecArray): string {
-	return str.replace(/{(\d+)}/g, function (match, number) {
-		return typeof args[number] !== 'undefined'
-			? args[number]
-			: match
-			;
-	});
-}
 
 interface SelectedTimeData {
 	time: Date;
@@ -186,7 +177,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		});
 
 		// announce time updates on selection of lines:
-		this._subscriptions.push(vscode.window.onDidChangeTextEditorSelection(async (ev) => {
+		this._subscriptions.push(vscode.window.onDidChangeTextEditorSelection(util.throttle((ev) => {
 			let data = this._documents.get(ev.textEditor.document.uri.toString());
 			if (data) {
 				// ev.kind: 1: Keyboard, 2: Mouse, 3: Command
@@ -194,7 +185,6 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				// we do only take single selections.
 				if (ev.selections.length === 1) {
 					const line = ev.selections[0].active.line; // 0-based
-					// determine time:
 					const time = this.provideTimeByData(data, line);
 					// post time update...
 					if (time.valueOf() > 0) {
@@ -203,7 +193,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					}
 				}
 			}
-		}));
+		}, 500)));
 
 		// check for changes of the documents
 		this._subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
@@ -560,7 +550,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						for (let j = 0; j < rEvents.length; ++j) {
 							const ev = rEvents[j];
 							if (match = ev.regex.exec(line.text)) {
-								let label: string = ev.label ? stringFormat(ev.label, match) : `${match[0]}`;
+								let label: string = ev.label ? util.stringFormat(ev.label, match) : `${match[0]}`;
 								if (ev.level > 0) {
 									const parentNode = getParent(ev.level);
 									parentNode.children.push({ label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [] });

@@ -51,11 +51,12 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 
 ## Planned features
 
+* Use outline instead of own tree view
 * add filtering based on events (remove all but the events)
 * automatic timezone detection
 * time sync auto-synchronization
 * change "smart-log" file type automatically to sub-types
-* change file type back to e.g. Log or Plain text on if no config is found.
+* change file type back to e.g. Log or Plain text if no config is found.
 * add event icon support in tree view
 * add event support to modify parent title
 * add decoration for time-sync

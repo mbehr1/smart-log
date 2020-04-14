@@ -2,7 +2,7 @@
 	"name": "smart-log",
 	"displayName": "Smart-Log",
 	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"license": "CC BY-NC-SA 4.0",
 	"publisher": "mbehr1",
 	"author": {
@@ -151,7 +151,7 @@
 											},
 											"timeSyncId": {
 												"type": "string",
-												"description": "Optional identifier of a 'time sync event'. This gets broadcasted to other documents with the time and the last regex capture as value."
+												"description": "Optional identifier of a 'time sync event'. This gets broadcasted to other documents with the time and the last regex capture in lower case as value."
 											},
 											"timeSyncPrio": {
 												"type": "integer",

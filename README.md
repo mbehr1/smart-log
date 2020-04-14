@@ -42,7 +42,7 @@ This extension contributes the following settings:
 
 ## Known Issues
 
-(Little testing done yet...)
+- processing large files is kind of slow. Need to process time info and decorations in the background.
 
 ## Contributions
 

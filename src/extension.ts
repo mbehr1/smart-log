@@ -83,7 +83,7 @@ interface DataPerDocument {
 	timeRegex?: RegExp; // from file config or default
 	timeFormat?: string;
 	timeAdjustMs?: number; // adjust in ms
-	timeSyncs?: Array<[number, TimeSyncData]>; // line, TimeSyncData here without time but line number
+	timeSyncs: Array<[number, TimeSyncData]>; // line, TimeSyncData here without time but line number
 };
 export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vscode.Disposable {
 	private _subscriptions: Array<vscode.Disposable> = new Array<vscode.Disposable>();
@@ -186,7 +186,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		});
 
 		// announce time updates on selection of lines:
-		this._subscriptions.push(vscode.window.onDidChangeTextEditorSelection(util.throttle((ev) => {
+		this._subscriptions.push(vscode.window.onDidChangeTextEditorSelection(util.throttle(async (ev) => {
 			let data = this._documents.get(ev.textEditor.document.uri.toString());
 			if (data) {
 				// ev.kind: 1: Keyboard, 2: Mouse, 3: Command
@@ -194,7 +194,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				// we do only take single selections.
 				if (ev.selections.length === 1) {
 					const line = ev.selections[0].active.line; // 0-based
-					const time = this.provideTimeByData(data, line);
+					const time = await this.provideTimeByData(data, line);
 					// post time update...
 					if (time.valueOf() > 0) {
 						console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
@@ -214,12 +214,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		}));
 
 		// register command for adjustTime
-		this._subscriptions.push(vscode.commands.registerTextEditorCommand("smart-log.adjustTime", (textEditor) => {
+		this._subscriptions.push(vscode.commands.registerTextEditorCommand("smart-log.adjustTime", async (textEditor) => {
 			console.log(`smart-log.adjustTime for ${textEditor.document.uri.toString()} called...`);
 			let data = this._documents.get(textEditor.document.uri.toString());
 			if (data) {
 				let curAdjustMs: number = data.timeAdjustMs ? data.timeAdjustMs : 0;
-				vscode.window.showInputBox({ prompt: `Enter time adjust in secs (cur = ${curAdjustMs / 1000}):`, value: (curAdjustMs / 1000).toString() }).then((value: string | undefined) => {
+				vscode.window.showInputBox({ prompt: `Enter time adjust in secs (cur = ${curAdjustMs / 1000}):`, value: (curAdjustMs / 1000).toString() }).then(async (value: string | undefined) => {
 					if (value) {
 						let newAdjustMs: number = (+value) * 1000;
 						if (data) {
@@ -229,7 +229,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 							if (data.timeSyncs) {
 								for (let i = 0; i < data.timeSyncs.length; ++i) {
 									const timeSyncEvent = data.timeSyncs[i];
-									timeSyncEvent[1].time = this.provideTimeByData(data, timeSyncEvent[0]);
+									timeSyncEvent[1].time = await this.provideTimeByData(data, timeSyncEvent[0]);
 								}
 								this.broadcastTimeSyncs(data);
 							}
@@ -319,7 +319,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			// do we support this document?
 			if (this._supportedLanguageIds.includes(doc.languageId)) {
 				console.log(`smart-log.addTextDocument adding ${doc.uri.toString()}`);
-				let data: DataPerDocument = { doc: doc };
+				let data: DataPerDocument = { doc: doc, timeSyncs: [] };
 				this._documents.set(doc.uri.toString(), data);
 				setTimeout(() => {
 					this.updateData(data);
@@ -358,8 +358,8 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		}
 	}
 
-	public provideHover(doc: vscode.TextDocument, position: vscode.Position): vscode.ProviderResult<vscode.Hover> {
-		const posTime = this.provideTime(doc, position);
+	public async provideHover(doc: vscode.TextDocument, position: vscode.Position): Promise<vscode.Hover | null> {
+		const posTime = await this.provideTime(doc, position);
 		//const timePos = this.providePositionCloseTo(doc, posTime);
 		return new vscode.Hover({ language: "smart-log", value: `calculated time: ${posTime.toLocaleTimeString()}.${posTime.valueOf() % 1000} line#=${position.line}` }); // posCloseTo=${timePos?.line}` });
 	}
@@ -375,7 +375,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		return null;
 	}
 
-	provideTime(doc: vscode.TextDocument, pos: vscode.Position): Date {
+	async provideTime(doc: vscode.TextDocument, pos: vscode.Position): Promise<Date> {
 		// console.log(`smart-log.provideTime(doc=${doc.uri.toString()}, pos.line=${pos.line}})`);
 		let data = this._documents.get(doc.uri.toString());
 		if (data) {
@@ -386,7 +386,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		return new Date(0);
 	}
 
-	provideTimeByData(data: DataPerDocument, line: number): Date {
+	async provideTimeByData(data: DataPerDocument, line: number): Promise<Date> {
 		if (data.cachedTimes && line < data.cachedTimes.length) {
 			const toRet = data.cachedTimes[line];
 			if (data.timeAdjustMs) {
@@ -400,57 +400,75 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				return new Date(0);
 			}
 
-			let d3TimeParser = null;
-			if (data.timeFormat) {
-				d3TimeParser = d3.timeParse(data.timeFormat);
-			}
 
-			// we reset the times here in any case:
-			data.cachedTimes = new Array<Date>();
+			return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, cancellable: true }, async (progress, cancelToken): Promise<Date> => {
 
-			// calc times for full document here (we could calc only for 0-pos.line...)
-			//  for each line provide time from current or lines above that have a time.
-			for (let i = 0; i < data.doc.lineCount; ++i) {
-				let curLine = data.doc.lineAt(i).text;
-				let regRes = curLine.match(data.timeRegex);
-				if (regRes) {
-					if (regRes.length >= 7) {
-						let year = +regRes[1];
-						if (year < 100) { year += 2000; }
-						const ms: number = regRes[7] ? +regRes[7] : 0;
-						let date = new Date(year, +regRes[2] - 1, +regRes[3], +regRes[4], +regRes[5], +regRes[6], ms);
-						data.cachedTimes.push(date);
-					} else if (regRes.length === 2) { // one complete date string
-						let date: Date | null = null;
-						if (d3TimeParser) {
-							try {
-								const parsedTime = d3TimeParser(regRes[1]);
-								// console.log(`got parsedTime ${parsedTime}`);
-								date = <Date>parsedTime;
-							} catch (error) {
-								console.log(`got error ${error}`);
-							}
-						} else {
-							date = new Date(regRes[1]);
+				let d3TimeParser = null;
+				if (data.timeFormat) {
+					d3TimeParser = d3.timeParse(data.timeFormat);
+				}
+
+				// we reset the times here in any case:
+				data.cachedTimes = new Array<Date>();
+
+				// calc times for full document here (we could calc only for 0-pos.line...)
+				//  for each line provide time from current or lines above that have a time.
+				let startTime = process.hrtime();
+				for (let i = 0; i < data.doc.lineCount; ++i) {
+					if (i % 1000 === 0) { // provide process and responsiveness for UI:
+						if (cancelToken.isCancellationRequested) {
+							return new Date(0);
 						}
-						data.cachedTimes.push(date ? date : new Date(0));
+						let curTime = process.hrtime(startTime);
+						if (curTime[1] / 1000000 > 100) { // 100ms passed
+							if (progress) {
+								progress.report({ message: `processed ${i}/${data.doc.lineCount} lines.` });
+							}
+							await util.sleep(10); // 10ms each 100ms
+							startTime = process.hrtime();
+						}
 					}
-				} else {
-					// use the one from prev. line
-					if (i > 0) {
-						data.cachedTimes.push(data.cachedTimes[i - 1]);
+					let curLine = data.doc.lineAt(i).text;
+					let regRes = curLine.match(data.timeRegex!);
+					if (regRes) {
+						if (regRes.length >= 7) {
+							let year = +regRes[1];
+							if (year < 100) { year += 2000; }
+							const ms: number = regRes[7] ? +regRes[7] : 0;
+							let date = new Date(year, +regRes[2] - 1, +regRes[3], +regRes[4], +regRes[5], +regRes[6], ms);
+							data.cachedTimes.push(date);
+						} else if (regRes.length === 2) { // one complete date string
+							let date: Date | null = null;
+							if (d3TimeParser) {
+								try {
+									const parsedTime = d3TimeParser(regRes[1]);
+									// console.log(`got parsedTime ${parsedTime}`);
+									date = <Date>parsedTime;
+								} catch (error) {
+									console.log(`got error ${error}`);
+								}
+							} else {
+								date = new Date(regRes[1]);
+							}
+							data.cachedTimes.push(date ? date : new Date(0));
+						}
 					} else {
-						data.cachedTimes.push(new Date(0));
+						// use the one from prev. line
+						if (i > 0) {
+							data.cachedTimes.push(data.cachedTimes[i - 1]);
+						} else {
+							data.cachedTimes.push(new Date(0));
+						}
 					}
 				}
-			}
-			console.log(`smart-log.provideTime calculated all times. (lines=${data.cachedTimes.length})`);
-			const toRet = data.cachedTimes[line];
-			if (data.timeAdjustMs) {
-				return new Date(toRet.valueOf() + data.timeAdjustMs);
-			} else {
-				return toRet;
-			}
+				console.log(`smart-log.provideTime calculated all times. (lines=${data.cachedTimes.length})`);
+				const toRet = data.cachedTimes[line];
+				if (data.timeAdjustMs) {
+					return new Date(toRet.valueOf() + data.timeAdjustMs);
+				} else {
+					return toRet;
+				}
+			});
 		}
 	}
 
@@ -496,7 +514,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
     /*
      * decorations support
      */
-	updateData(data: DataPerDocument): void {
+	async updateData(data: DataPerDocument) {
 		console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()})...`);
 		const doc = data.doc;
 		const text = doc.getText();
@@ -574,63 +592,79 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				}
 			}
 
-			try {
-				if (rEvents.length) {
-					for (let i = 0; i < doc.lineCount; ++i) {
-						const line = doc.lineAt(i);
-
-						// scan for event matches: (in sequence due to level, so sadly not in parallel...)
-						for (let j = 0; j < rEvents.length; ++j) {
-							const ev = rEvents[j];
-							if (match = ev.regex.exec(line.text)) {
-								let label: string = ev.label ? util.stringFormat(ev.label, match) : `${match[0]}`;
-								if (ev.level > 0) {
-									const parentNode = getParent(ev.level);
-									parentNode.children.push({ label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [] });
+			return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification }, async (progress) => {
+				try {
+					if (rEvents.length) {
+						let startTime = process.hrtime();
+						for (let i = 0; i < doc.lineCount; ++i) {
+							let curTime = process.hrtime(startTime);
+							if (curTime[1] / 1000000 > 100) { // 100ms passed
+								if (progress) {
+									progress.report({ message: `decorated ${i}/${data.doc.lineCount} lines.` });
 								}
-								if (ev.decorationId) {
-									if (this._decorationTypes.has(ev.decorationId)) {
-										const decoration = this._decorationTypes.get(ev.decorationId);
-										if (decoration) {
-											if (!decorations.has(decoration)) {
-												decorations.set(decoration, []);
+								await util.sleep(10); // 10ms each 100ms
+								startTime = process.hrtime();
+							}
+							const line = doc.lineAt(i);
+
+							// scan for event matches: (in sequence due to level, so sadly not in parallel...)
+							for (let j = 0; j < rEvents.length; ++j) {
+								const ev = rEvents[j];
+								if (match = ev.regex.exec(line.text)) {
+									let label: string = ev.label ? util.stringFormat(ev.label, match) : `${match[0]}`;
+									if (ev.level > 0) {
+										const parentNode = getParent(ev.level);
+										parentNode.children.push({ label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [] });
+									}
+									if (ev.decorationId) {
+										if (this._decorationTypes.has(ev.decorationId)) {
+											const decoration = this._decorationTypes.get(ev.decorationId);
+											if (decoration) {
+												if (!decorations.has(decoration)) {
+													decorations.set(decoration, []);
+												}
+												decorations.get(decoration)?.push({ range: line.range, hoverMessage: `${label}` });
 											}
-											decorations.get(decoration)?.push({ range: line.range, hoverMessage: `${label}` });
 										}
 									}
-								}
-								if (ev.timeSyncId && ev.timeSyncPrio) {
-									console.log(` found timeSyncId(${ev.timeSyncId}) with value '${match[match.length - 1]}'`);
-									data.timeSyncs.push([line.lineNumber, { id: ev.timeSyncId, value: match[match.length - 1], time: this.provideTimeByData(data, line.lineNumber), prio: ev.timeSyncPrio }]);
+									if (ev.timeSyncId && ev.timeSyncPrio) {
+										console.log(` found timeSyncId(${ev.timeSyncId}) with value '${match[match.length - 1].toLowerCase()}'`);
+										data.timeSyncs.push([line.lineNumber, { id: ev.timeSyncId, value: match[match.length - 1].toLowerCase(), time: await this.provideTimeByData(data, line.lineNumber), prio: ev.timeSyncPrio }]);
+									}
 								}
 							}
 						}
 					}
+				} catch (error) {
+					console.log(`error: ${error} occurred!`);
 				}
-			} catch (error) {
-				console.log(`error: ${error} occurred!`);
-			}
-			data.eventTreeNode = eventRoot;
+				data.eventTreeNode = eventRoot;
 
-			data.decorations = new Array<[vscode.TextEditorDecorationType, Array<vscode.DecorationOptions>]>();
-			decorations.forEach((value, key) => { // todo if a prev. DecorationType is missing it's not set!
-				data.decorations?.push([key, value]);
+				data.decorations = new Array<[vscode.TextEditorDecorationType, Array<vscode.DecorationOptions>]>();
+				decorations.forEach((value, key) => { // todo if a prev. DecorationType is missing it's not set!
+					data.decorations?.push([key, value]);
+				});
+
+				// if we have time sync events broadcast them:
+				this.broadcastTimeSyncs(data);
+				this.checkActiveTextEditor(data);
+				this.updateDecorations(data);
+				// we fire here the event as well to update the tree:
+				this._onDidChangeTreeData.fire();
+
 			});
 
-			// if we have time sync events broadcast them:
-			this.broadcastTimeSyncs(data);
 
 		} else {
 			console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()}) has no data!`);
 			// no config
 			data.eventTreeNode = undefined;
 			data.decorations = undefined; // this won't delete the old ones! todo
+			this.checkActiveTextEditor(data);
+			this.updateDecorations(data);
+			// we fire here the event as well to update the tree:
+			this._onDidChangeTreeData.fire();
 		}
-
-		this.checkActiveTextEditor(data);
-		this.updateDecorations(data);
-		// we fire here the event as well to update the tree:
-		this._onDidChangeTreeData.fire();
 	}
 
 	checkActiveTextEditor(data: DataPerDocument) {
@@ -712,7 +746,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						});
 					}
 				}
-				if (ev.timeSyncs?.length && data.timeSyncs?.length) {
+				if (ev.timeSyncs?.length && data.timeSyncs.length) {
 					console.log(` got ${ev.timeSyncs.length} timeSyncs from ${ev.uri.toString()}`);
 					// todo auto timesync... 
 					let adjustTimeBy: number[] = [];

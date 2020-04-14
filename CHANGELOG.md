@@ -3,6 +3,12 @@
 All notable changes to the "smart-log" extension will be documented in this file.
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
+
+## [1.2.1]
+
+- Send time sync values in lower case letters.
+- Improve UI responsiveness by using some asyncs and showing progress.
+
 ## [1.2.0]
 
 - First part of auto time-sync feature (introduction of timeSyncId, timeSyncPrio to events). Does broadcast the events already but does not adjust time yet (just prints on console min/max/avg adjustment values).

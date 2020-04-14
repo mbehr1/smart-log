@@ -22,6 +22,8 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
   - An offset for the full file can be set via context menu item *adjust time...*.
   - Posts events of the selected time to other documents/plugins. (See ... <todo>).
   - Allows to "synchronize" this time with other visible documents from all plugins that support "onDidChangeSelectedTime" events. 
+  - **Automatic time synchronization of multiple documents** by "time-sync events" (see settings event.timeSyncId and event.timeSyncPrio) (todo add example).
+
 - Allows configuration of **multiple file types** (see settings smart-log.fileConfigs).
 
 ## Requirements
@@ -54,7 +56,6 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 * Use outline instead of own tree view
 * add filtering based on events (remove all but the events)
 * automatic timezone detection
-* time sync auto-synchronization
 * change "smart-log" file type automatically to sub-types
 * change file type back to e.g. Log or Plain text if no config is found.
 * add event icon support in tree view

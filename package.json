@@ -2,7 +2,7 @@
 	"name": "smart-log",
 	"displayName": "Smart-Log",
 	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"license": "CC BY-NC-SA 4.0",
 	"publisher": "mbehr1",
 	"author": {
@@ -148,6 +148,14 @@
 											"decorationId": {
 												"type": "string",
 												"description": "Identifier of the decoration to use. Defaults to none."
+											},
+											"timeSyncId": {
+												"type": "string",
+												"description": "Optional identifier of a 'time sync event'. This gets broadcasted to other documents with the time and the last regex capture as value."
+											},
+											"timeSyncPrio": {
+												"type": "integer",
+												"description": "Optional (needed if timeSyncId is used) priority of the time-sync event. As two documents exchange their events by this prio they decide on who will adjust the time. The event with the highest prio (lowest number) will be used."
 											}
 										}
 									}

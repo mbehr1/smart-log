@@ -12,9 +12,17 @@ let reporter: TelemetryReporter;
 
 const smartLogLanguageId: string = "smart-log";
 
+interface TimeSyncData {
+	time: Date,
+	id: string,
+	value: string,
+	prio: number
+};
+
 interface SelectedTimeData {
 	time: Date;
 	uri: vscode.Uri;
+	timeSyncs?: Array<TimeSyncData>; // these are not specific to a selected line. Time will be 0 then.
 };
 
 export function activate(context: vscode.ExtensionContext) {
@@ -75,6 +83,7 @@ interface DataPerDocument {
 	timeRegex?: RegExp; // from file config or default
 	timeFormat?: string;
 	timeAdjustMs?: number; // adjust in ms
+	timeSyncs?: Array<[number, TimeSyncData]>; // line, TimeSyncData here without time but line number
 };
 export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vscode.Disposable {
 	private _subscriptions: Array<vscode.Disposable> = new Array<vscode.Disposable>();
@@ -215,6 +224,15 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						let newAdjustMs: number = (+value) * 1000;
 						if (data) {
 							data.timeAdjustMs = newAdjustMs;
+
+							// update times for timesyncs:
+							if (data.timeSyncs) {
+								for (let i = 0; i < data.timeSyncs.length; ++i) {
+									const timeSyncEvent = data.timeSyncs[i];
+									timeSyncEvent[1].time = this.provideTimeByData(data, timeSyncEvent[0]);
+								}
+								this.broadcastTimeSyncs(data);
+							}
 						}
 					}
 				});
@@ -462,6 +480,19 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		return undefined;
 	}
 
+	broadcastTimeSyncs(data: DataPerDocument) {
+		if (data.timeSyncs?.length) {
+			// console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
+			let timeSyncs = [];
+			for (let i = 0; i < data.timeSyncs.length; ++i) {
+				const timeSyncEvent = data.timeSyncs[i];
+				timeSyncs.push(timeSyncEvent[1]);
+			}
+			console.log(`broadcasting ${timeSyncs.length} time syncs via onDidChangeSelectedTime`);
+			this._onDidChangeSelectedTime.fire({ time: new Date(0), uri: data.doc.uri, timeSyncs: timeSyncs });
+		}
+	}
+
     /*
      * decorations support
      */
@@ -497,6 +528,8 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			}
 		}
 
+		data.timeSyncs = []; // reset them here.
+
 		if (identifiedFileConfig) {
 
 			if ("timeRegex" in identifiedFileConfig) {
@@ -513,12 +546,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 			const events: any | undefined = identifiedFileConfig.events;
 			// create the RegExps here to have them compiled and not created line by line
-			let rEvents = new Array<{ regex: RegExp, label: string, level: number, decorationId?: string }>();
+			let rEvents = new Array<{ regex: RegExp, label: string, level: number, decorationId?: string, timeSyncId?: string, timeSyncPrio?: number }>();
 			if (events) {
 				for (let i = 0; i < events.length; ++i) {
 					const event: any | undefined = events[i];
 					if (event.regex) { // level, label and decorationId are optional
-						rEvents.push({ regex: new RegExp(event.regex), label: event.label, level: event.level ? event.level : 0, decorationId: event.decorationId });
+						rEvents.push({ regex: new RegExp(event.regex), label: event.label, level: event.level ? event.level : 0, decorationId: event.decorationId, timeSyncId: event.timeSyncId, timeSyncPrio: event.timeSyncPrio });
 					}
 				}
 			}
@@ -566,6 +599,10 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 										}
 									}
 								}
+								if (ev.timeSyncId && ev.timeSyncPrio) {
+									console.log(` found timeSyncId(${ev.timeSyncId}) with value '${match[match.length - 1]}'`);
+									data.timeSyncs.push([line.lineNumber, { id: ev.timeSyncId, value: match[match.length - 1], time: this.provideTimeByData(data, line.lineNumber), prio: ev.timeSyncPrio }]);
+								}
 							}
 						}
 					}
@@ -579,6 +616,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			decorations.forEach((value, key) => { // todo if a prev. DecorationType is missing it's not set!
 				data.decorations?.push([key, value]);
 			});
+
+			// if we have time sync events broadcast them:
+			this.broadcastTimeSyncs(data);
 
 		} else {
 			console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()}) has no data!`);
@@ -659,16 +699,61 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 	handleDidChangeSelectedTime(ev: SelectedTimeData) {
 		console.log(`smart-log.handleDidChangeSelectedTime got ev from uri=${ev.uri.toString()}`);
-		this._documents.forEach((value) => {
-			if (value.doc.uri.toString() !== ev.uri.toString()) {
-				console.log(` trying to reveal ${ev.time.toLocaleTimeString()} at doc ${value.doc.uri.toString()}`);
-				let position = this.providePositionCloseTo(value.doc, ev.time);
-				if (position && value.textEditors) {
-					const posRange = new vscode.Range(position, position);
-					value.textEditors.forEach((value) => {
-						value.revealRange(posRange, vscode.TextEditorRevealType.AtTop);
-						// todo add/update decoration as well
-					});
+		this._documents.forEach((data) => {
+			if (data.doc.uri.toString() !== ev.uri.toString()) {
+				if (ev.time.valueOf() > 0) {
+					console.log(` trying to reveal ${ev.time.toLocaleTimeString()} at doc ${data.doc.uri.toString()}`);
+					let position = this.providePositionCloseTo(data.doc, ev.time);
+					if (position && data.textEditors) {
+						const posRange = new vscode.Range(position, position);
+						data.textEditors.forEach((value) => {
+							value.revealRange(posRange, vscode.TextEditorRevealType.AtTop);
+							// todo add/update decoration as well
+						});
+					}
+				}
+				if (ev.timeSyncs?.length && data.timeSyncs?.length) {
+					console.log(` got ${ev.timeSyncs.length} timeSyncs from ${ev.uri.toString()}`);
+					// todo auto timesync... 
+					let adjustTimeBy: number[] = [];
+					let reBroadcastEvents: TimeSyncData[] = [];
+
+					// compare with our known timesyncs.
+					for (let i = 0; i < ev.timeSyncs.length; ++i) {
+						const remoteSyncEv = ev.timeSyncs[i];
+						console.log(`  got id='${remoteSyncEv.id}' with value='${remoteSyncEv.value} at ${remoteSyncEv.time.toLocaleTimeString()}`);
+						// do we have this id? (optimize with maps... for now linear (search))
+						for (let j = 0; i < data.timeSyncs.length; ++j) {
+							const localSyncLineEv = data.timeSyncs[j];
+							const localSyncEv = localSyncLineEv[1];
+							if (remoteSyncEv.id === localSyncEv.id) {
+								console.log(`  got id='${remoteSyncEv.id}' match. Checking value='${remoteSyncEv.value} at ${remoteSyncEv.time.toLocaleTimeString()}`);
+								if (remoteSyncEv.value === localSyncEv.value) {
+									console.log(`   got id='${remoteSyncEv.id}',prio=${remoteSyncEv.prio} and value='${remoteSyncEv.value} match at ${remoteSyncEv.time.toLocaleTimeString()} with local line ${localSyncLineEv[0]}, prio=${localSyncEv.prio}`);
+									// todo! (what to do now? how to decide whether to adjust here (and not on the other side...))
+									// if the received prio is lower we adjust our time... // todo consider 3 documents...
+									// otherwise we broadcast all values with a lower prio than the current received ones...
+									if (remoteSyncEv.prio < localSyncEv.prio) {
+										adjustTimeBy.push(localSyncEv.time.valueOf() - remoteSyncEv.time.valueOf());
+									} else if (remoteSyncEv.prio > localSyncEv.prio) {
+										reBroadcastEvents.push(localSyncEv);
+									}
+								}
+							}
+						}
+					}
+					if (adjustTimeBy.length) {
+						const minAdjust = Math.min(...adjustTimeBy);
+						const maxAdjust = Math.max(...adjustTimeBy);
+						const avgAdjust = adjustTimeBy.reduce((a, b) => a + b, 0) / adjustTimeBy.length;
+						console.log(`have ${adjustTimeBy.length} time adjustments with min=${minAdjust}, max=${maxAdjust}, avg=${avgAdjust} ms.`);
+						// todo: do adjust...
+					}
+					if (reBroadcastEvents.length) {
+						console.log(`re-broadcasting ${reBroadcastEvents.length} time syncs via onDidChangeSelectedTime`);
+						this._onDidChangeSelectedTime.fire({ time: new Date(0), uri: data.doc.uri, timeSyncs: reBroadcastEvents });
+					}
+
 				}
 			}
 		});

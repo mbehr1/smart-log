@@ -757,7 +757,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						const remoteSyncEv = ev.timeSyncs[i];
 						console.log(`  got id='${remoteSyncEv.id}' with value='${remoteSyncEv.value} at ${remoteSyncEv.time.toLocaleTimeString()}`);
 						// do we have this id? (optimize with maps... for now linear (search))
-						for (let j = 0; i < data.timeSyncs.length; ++j) {
+						for (let j = 0; j < data.timeSyncs.length; ++j) {
 							const localSyncLineEv = data.timeSyncs[j];
 							const localSyncEv = localSyncLineEv[1];
 							if (remoteSyncEv.id === localSyncEv.id) {

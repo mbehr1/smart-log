@@ -2,7 +2,7 @@
 	"name": "smart-log",
 	"displayName": "Smart-Log",
 	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "1.2.2",
+	"version": "1.3.0",
 	"license": "CC BY-NC-SA 4.0",
 	"publisher": "mbehr1",
 	"author": {
@@ -211,6 +211,21 @@
 			{
 				"command": "smart-log.adjustTime",
 				"title": "adjust time..."
+			},
+			{
+				"command": "smart-log.sendTime",
+				"title": "send selected time",
+				"icon": "$(sync)"
+			},
+			{
+				"command": "smart-log.sendTimeSyncEvents",
+				"title": "send detected time sync events",
+				"icon": "$(sync)"
+			},
+			{
+				"command": "smart-log.toggleTimeSync",
+				"title": "toggle auto time sync",
+				"icon": "$(sync-ignored)"
 			}
 		],
 		"menus": {
@@ -219,6 +234,19 @@
 					"group": "1_modification",
 					"command": "smart-log.adjustTime",
 					"when": "editorLangId == smart-log"
+				},
+				{
+					"group": "0_navigation",
+					"command": "smart-log.sendTime",
+					"when": "editorLangId == smart-log"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "smart-log.toggleTimeSync",
+					"alt": "smart-log.sendTimeSyncEvents",
+					"when": "editorLangId == smart-log",
+					"group": "navigation"
 				}
 			]
 		},

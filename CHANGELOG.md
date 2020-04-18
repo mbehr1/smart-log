@@ -3,6 +3,12 @@
 All notable changes to the "smart-log" extension will be documented in this file.
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
+## [1.3.0]
+
+- Auto time-sync (sending time events on selection of a line) can be turned on/off now with the sync button in the editor title. Default off.
+- If turned off the time can be send manually by selecting the "send selected time" context button.
+- Detected time-sync events can be resend by using "alt/option" on the sync button in the editor title.
+
 ## [1.2.2]
 
 - Time sync loop iterator fix.

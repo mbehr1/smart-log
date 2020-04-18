@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const extVscLfs = vscode.extensions.getExtension('mbehr1.vsc-lfs');
 	if (!extVscLfs) {
 		vscode.window.showInformationMessage(
-			'You do not seem to have the "large file" extension installed. So you might not be able to load text files >5MB. Consider installing extension "vsc-lsf".'
+			'You do not seem to have the "large file" extension installed. So you might not be able to load text files >50MB. Consider installing extension "vsc-lsf".'
 		);
 	}
 
@@ -103,6 +103,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		new RegExp(<string>(vscode.workspace.getConfiguration().get<string>("smart-log.timeRegex"))) : this._defaultTimeRegex;
 	private _timeFormat = vscode.workspace.getConfiguration().get<string>("smart-log.timeFormat");
 
+	private _autoTimeSync = false; // todo config
 
 	private _onDidChangeTreeData: vscode.EventEmitter<EventNode | null> = new vscode.EventEmitter<EventNode | null>();
 	readonly onDidChangeTreeData: vscode.Event<EventNode | null> = this._onDidChangeTreeData.event;
@@ -187,18 +188,20 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 		// announce time updates on selection of lines:
 		this._subscriptions.push(vscode.window.onDidChangeTextEditorSelection(util.throttle(async (ev) => {
-			let data = this._documents.get(ev.textEditor.document.uri.toString());
-			if (data) {
-				// ev.kind: 1: Keyboard, 2: Mouse, 3: Command
-				//console.log(`smart-log.onDidChangeTextEditorSelection doc=${data.doc.uri.toString()} ev.kind=${ev.kind} #selections=${ev.selections.length}`);
-				// we do only take single selections.
-				if (ev.selections.length === 1) {
-					const line = ev.selections[0].active.line; // 0-based
-					const time = await this.provideTimeByData(data, line);
-					// post time update...
-					if (time.valueOf() > 0) {
-						console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
-						this._onDidChangeSelectedTime.fire({ time: time, uri: data.doc.uri });
+			if (this._autoTimeSync) {
+				let data = this._documents.get(ev.textEditor.document.uri.toString());
+				if (data) {
+					// ev.kind: 1: Keyboard, 2: Mouse, 3: Command
+					//console.log(`smart-log.onDidChangeTextEditorSelection doc=${data.doc.uri.toString()} ev.kind=${ev.kind} #selections=${ev.selections.length}`);
+					// we do only take single selections.
+					if (ev.selections.length === 1) {
+						const line = ev.selections[0].active.line; // 0-based
+						const time = await this.provideTimeByData(data, line);
+						// post time update...
+						if (time.valueOf() > 0) {
+							console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
+							this._onDidChangeSelectedTime.fire({ time: time, uri: data.doc.uri });
+						}
 					}
 				}
 			}
@@ -236,6 +239,39 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						}
 					}
 				});
+			}
+		}));
+
+		this._subscriptions.push(vscode.commands.registerCommand("smart-log.toggleTimeSync", () => {
+			console.log(`smart-log.toggleTimeSync called...`);
+			this._autoTimeSync = !this._autoTimeSync;
+			vscode.window.showInformationMessage(`Auto time-sync turned ${this._autoTimeSync ? "on. Selecting a line will send the corresponding time." : "off. To send the time use the context menu 'send selected time' command."}`);
+		}));
+
+		this._subscriptions.push(vscode.commands.registerTextEditorCommand("smart-log.sendTimeSyncEvents", async (textEditor) => {
+			console.log(`smart-log.sendTimeSyncEvents for ${textEditor.document.uri.toString()} called...`);
+			let data = this._documents.get(textEditor.document.uri.toString());
+			if (data) {
+				this.broadcastTimeSyncs(data);
+			}
+		}));
+
+		this._subscriptions.push(vscode.commands.registerTextEditorCommand("smart-log.sendTime", async (textEditor) => {
+			console.log(`smart-log.sendTime for ${textEditor.document.uri.toString()} called...`);
+			let data = this._documents.get(textEditor.document.uri.toString());
+			if (data) {
+				// ev.kind: 1: Keyboard, 2: Mouse, 3: Command
+				//console.log(`smart-log.onDidChangeTextEditorSelection doc=${data.doc.uri.toString()} ev.kind=${ev.kind} #selections=${ev.selections.length}`);
+				// we do only take single selections.
+				if (textEditor.selections.length === 1) {
+					const line = textEditor.selections[0].active.line; // 0-based
+					const time = await this.provideTimeByData(data, line);
+					// post time update...
+					if (time.valueOf() > 0) {
+						console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
+						this._onDidChangeSelectedTime.fire({ time: time, uri: data.doc.uri });
+					}
+				}
 			}
 		}));
 
@@ -768,7 +804,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 									// if the received prio is lower we adjust our time... // todo consider 3 documents...
 									// otherwise we broadcast all values with a lower prio than the current received ones...
 									if (remoteSyncEv.prio < localSyncEv.prio) {
-										adjustTimeBy.push(localSyncEv.time.valueOf() - remoteSyncEv.time.valueOf());
+										adjustTimeBy.push(remoteSyncEv.time.valueOf() - localSyncEv.time.valueOf());
 									} else if (remoteSyncEv.prio > localSyncEv.prio) {
 										reBroadcastEvents.push(localSyncEv);
 									}

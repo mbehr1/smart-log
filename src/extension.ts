@@ -442,6 +442,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 			console.log(`smart-log.provideTimeByData regenerating cachedTimes. line=${line}/${data.doc.lineCount} vs. cachedTimes.lines=${data.cachedTimes?.length}`);
 
+			// we reset the times here in any case:
+			// there is a race cond here that this function gets called multiple times (as the function calls sleep...)
+			// so as hotfix we do change the cachedTimes array only once all calculated.
+			// proper fix pending.
+			data.cachedTimes = undefined;
+
 			return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, cancellable: true }, async (progress, cancelToken): Promise<Date> => {
 
 				let d3TimeParser = null;
@@ -449,8 +455,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					d3TimeParser = d3.timeParse(data.timeFormat);
 				}
 
-				// we reset the times here in any case:
-				data.cachedTimes = new Array<Date>();
+				let cachedTimes = new Array<Date>();
 
 				// calc times for full document here (we could calc only for 0-pos.line...)
 				//  for each line provide time from current or lines above that have a time.
@@ -477,7 +482,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 							if (year < 100) { year += 2000; }
 							const ms: number = regRes[7] ? +regRes[7] : 0;
 							let date = new Date(year, +regRes[2] - 1, +regRes[3], +regRes[4], +regRes[5], +regRes[6], ms);
-							data.cachedTimes.push(date);
+							cachedTimes.push(date);
 						} else if (regRes.length === 2) { // one complete date string
 							let date: Date | null = null;
 							if (d3TimeParser) {
@@ -491,17 +496,18 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 							} else {
 								date = new Date(regRes[1]);
 							}
-							data.cachedTimes.push(date ? date : new Date(0));
+							cachedTimes.push(date ? date : new Date(0));
 						}
 					} else {
 						// use the one from prev. line
 						if (i > 0) {
-							data.cachedTimes.push(data.cachedTimes[i - 1]);
+							cachedTimes.push(cachedTimes[i - 1]);
 						} else {
-							data.cachedTimes.push(new Date(0));
+							cachedTimes.push(new Date(0));
 						}
 					}
 				}
+				data.cachedTimes = cachedTimes;
 				console.log(`smart-log.provideTime calculated all times. (lines=${data.cachedTimes.length})`);
 				const toRet = data.cachedTimes[line];
 				if (data.timeAdjustMs) {

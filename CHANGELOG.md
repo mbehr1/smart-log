@@ -4,6 +4,9 @@ All notable changes to the "smart-log" extension will be documented in this file
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
+## [1.4.2]
+- Hotfix for the race condition (multiple entrance) of provideTimeByData.
+
 ## [1.4.1]
 - Added some console logs to find a bug where sometimes hover times are wrong.
 

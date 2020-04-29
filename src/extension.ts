@@ -396,8 +396,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 	public async provideHover(doc: vscode.TextDocument, position: vscode.Position): Promise<vscode.Hover | null> {
 		const posTime = await this.provideTime(doc, position);
-		//const timePos = this.providePositionCloseTo(doc, posTime);
-		return new vscode.Hover({ language: "smart-log", value: `calculated time: ${posTime.toLocaleTimeString()}.${posTime.valueOf() % 1000} line#=${position.line}` }); // posCloseTo=${timePos?.line}` });
+		if (posTime && posTime.valueOf() > 0) {
+			//const timePos = this.providePositionCloseTo(doc, posTime);
+			return new vscode.Hover({ language: "smart-log", value: `calculated time: ${posTime.toLocaleTimeString()}.${posTime.valueOf() % 1000} line#=${position.line}` }); // posCloseTo=${timePos?.line}` });
+		}
+		console.warn(`smart-log.provideHover: can't determine time for position.line=${position.line} posTime=${posTime?.valueOf()}`);
+		return null;
 	}
 
 	public provideDocumentHighlights(doc: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.DocumentHighlight[]> {
@@ -436,6 +440,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				return new Date(0);
 			}
 
+			console.log(`smart-log.provideTimeByData regenerating cachedTimes. line=${line}/${data.doc.lineCount} vs. cachedTimes.lines=${data.cachedTimes?.length}`);
 
 			return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, cancellable: true }, async (progress, cancelToken): Promise<Date> => {
 

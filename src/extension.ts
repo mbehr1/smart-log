@@ -298,7 +298,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		// we do have to connect to ourself as well (in case of multiple smart-logs docs)
 		this._subscriptions.push(vscode.extensions.onDidChange(() => {
 			console.log(`smart-log.extensions.onDidChange #ext=${vscode.extensions.all.length}`);
-			this.checkActiveExtensions();
+			setTimeout(() => {
+				this.checkActiveExtensions();
+			}, 1500); // let the new ext. start first. This introduces a race for auto-time-sync events.todo
 		}));
 		setTimeout(() => {
 			this.checkActiveExtensions();
@@ -911,7 +913,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				value.dispose();
 			}
 		});
-		this._didChangeSelectedTimeSubscriptions = new Array<vscode.Disposable>();
+		this._didChangeSelectedTimeSubscriptions = [];
+
+		let newSubs = new Array<vscode.Disposable>();
 
 		vscode.extensions.all.forEach((value) => {
 			if (value.isActive) {
@@ -923,8 +927,8 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 							this.handleDidChangeSelectedTime(ev);
 						});
 						if (subscr !== undefined) {
-							console.log(` got onDidChangeSelectedTime api from ${value.id}`);
-							this._didChangeSelectedTimeSubscriptions.push(subscr);
+							console.log(`smart-log.got onDidChangeSelectedTime api from ${value.id}`);
+							newSubs.push(subscr);
 						}
 					}
 				} catch (error) {
@@ -932,6 +936,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				}
 			}
 		});
+		this._didChangeSelectedTimeSubscriptions = newSubs;
 		console.log(`smart-log.checkActiveExtensions: got ${this._didChangeSelectedTimeSubscriptions.length} subscriptions.`);
 	}
 

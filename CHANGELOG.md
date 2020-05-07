@@ -4,6 +4,9 @@ All notable changes to the "smart-log" extension will be documented in this file
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
+## [1.5.1]
+- change the checkActiveExtensions impl. Debounce a bit.
+
 ## [1.5.0]
 - Fix react to received times (didn't reveal the appropriate line / didn't react at all)
 - If a time was received already the *adjust-time...* will propose to adjust/sync that line to the selected one.

@@ -20,6 +20,7 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
 - **Time sync** feature (todo movie...):
   - Detects time for each line.
   - An offset for the full file can be set via context menu item *adjust time...*.
+  - If a time was received already the *adjust-time...* will propose to adjust/sync that line to the selected one.
   - Posts events of the selected time to other documents/plugins. (See ... <todo>).
   - Allows to "synchronize" this time with other visible documents from all plugins that support "onDidChangeSelectedTime" events. 
   - **Automatic time synchronization of multiple documents** by "time-sync events" (see settings event.timeSyncId and event.timeSyncPrio) (todo add example).

@@ -83,6 +83,8 @@ interface DataPerDocument {
 	timeRegex?: RegExp; // from file config or default
 	timeFormat?: string;
 	timeAdjustMs?: number; // adjust in ms
+	lastSelectedTimeEv: Date | undefined; // the last received time event that might have been used to reveal our line. used for adjustTime on last event feature.
+	gotTimeSyncEvents: boolean; // we've synced at least once to our time based on timeSync events
 	timeSyncs: Array<[number, TimeSyncData]>; // line, TimeSyncData here without time but line number
 };
 export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vscode.Disposable {
@@ -196,7 +198,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					// we do only take single selections.
 					if (ev.selections.length === 1) {
 						const line = ev.selections[0].active.line; // 0-based
-						const time = await this.provideTimeByData(data, line);
+						const time: Date = await this.provideTimeByData(data, line);
 						// post time update...
 						if (time.valueOf() > 0) {
 							console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
@@ -211,6 +213,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		this._subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
 			let data = this._documents.get(event.document.uri.toString());
 			if (data) {
+				console.log(`onDidChangeTextDocument data.doc.lineCount=${data.doc.lineCount}`);
 				data.cachedTimes = undefined;
 				this.updateData(data);
 			}
@@ -222,23 +225,39 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			let data = this._documents.get(textEditor.document.uri.toString());
 			if (data) {
 				let curAdjustMs: number = data.timeAdjustMs ? data.timeAdjustMs : 0;
-				vscode.window.showInputBox({ prompt: `Enter time adjust in secs (cur = ${curAdjustMs / 1000}):`, value: (curAdjustMs / 1000).toString() }).then(async (value: string | undefined) => {
-					if (value) {
-						let newAdjustMs: number = (+value) * 1000;
-						if (data) {
-							data.timeAdjustMs = newAdjustMs;
-
-							// update times for timesyncs:
-							if (data.timeSyncs) {
-								for (let i = 0; i < data.timeSyncs.length; ++i) {
-									const timeSyncEvent = data.timeSyncs[i];
-									timeSyncEvent[1].time = await this.provideTimeByData(data, timeSyncEvent[0]);
-								}
-								this.broadcastTimeSyncs(data);
+				// check first whether we shall use the last received time event?
+				// we do this only if we didn't receive any timeSyncs (assuming that the next one will auto update anyhow so it makes no sense to change man.)
+				let doManualPrompt = true;
+				if (!data.gotTimeSyncEvents && data.lastSelectedTimeEv) {
+					// determine current selected time:
+					if (textEditor.selections.length === 1) {
+						const line = textEditor.selections[0].active.line; // 0-based
+						const time: Date | undefined = this.provideTimeByDataSync(data, line);
+						if (time && time.valueOf() > 0) {
+							// calc adjust value:
+							let selTimeAdjustValue = data.lastSelectedTimeEv.valueOf() - time.valueOf();
+							let response: string | undefined =
+								await vscode.window.showInformationMessage(`Adjust based on last received time event (adjust by ${selTimeAdjustValue / 1000} secs)?`,
+									{ modal: true }, "yes", "no");
+							if (response === "yes") {
+								doManualPrompt = false;
+								this.adjustTime(data, selTimeAdjustValue);
+							} else if (!response) {
+								doManualPrompt = false;
 							}
 						}
 					}
-				});
+				}
+				if (doManualPrompt) {
+					vscode.window.showInputBox({ prompt: `Enter new time adjust in secs (cur = ${curAdjustMs / 1000}):`, value: (curAdjustMs / 1000).toString() }).then(async (value: string | undefined) => {
+						if (value) {
+							let newAdjustMs: number = (+value) * 1000;
+							if (data) {
+								this.adjustTime(data, newAdjustMs - curAdjustMs);
+							}
+						}
+					});
+				}
 			}
 		}));
 
@@ -265,7 +284,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				// we do only take single selections.
 				if (textEditor.selections.length === 1) {
 					const line = textEditor.selections[0].active.line; // 0-based
-					const time = await this.provideTimeByData(data, line);
+					const time: Date = await this.provideTimeByData(data, line);
 					// post time update...
 					if (time.valueOf() > 0) {
 						console.log(` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, "0")}`);
@@ -304,6 +323,21 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				value.dispose();
 			}
 		});
+	}
+
+	async adjustTime(data: DataPerDocument, relOffset: number) {
+		if (!data.timeAdjustMs) { data.timeAdjustMs = 0; }
+		data.timeAdjustMs += relOffset;
+		console.log(`dlt-logs.adjustTime(${relOffset}) to new offset: ${data.timeAdjustMs}`);
+
+		// update times for timesyncs:
+		if (data.timeSyncs) {
+			for (let i = 0; i < data.timeSyncs.length; ++i) {
+				const timeSyncEvent = data.timeSyncs[i];
+				timeSyncEvent[1].time = await this.provideTimeByData(data, timeSyncEvent[0]);
+			}
+			this.broadcastTimeSyncs(data);
+		}
 	}
 
 	parseDecorationsConfig(decorationConfigs: Array<object> | undefined): void {
@@ -355,7 +389,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			// do we support this document?
 			if (this._supportedLanguageIds.includes(doc.languageId)) {
 				console.log(`smart-log.addTextDocument adding ${doc.uri.toString()}`);
-				let data: DataPerDocument = { doc: doc, timeSyncs: [] };
+				let data: DataPerDocument = { doc: doc, timeSyncs: [], lastSelectedTimeEv: undefined, gotTimeSyncEvents: false };
 				this._documents.set(doc.uri.toString(), data);
 				setTimeout(() => {
 					this.updateData(data);
@@ -424,6 +458,24 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			console.log("smart-log.provideTime called for an unknown/unhandled document!");
 		}
 		return new Date(0);
+	}
+
+	provideTimeByDataSync(data: DataPerDocument, line: number): Date | undefined {
+		// console.log(`smart-log.provideTime(doc=${doc.uri.toString()}, pos.line=${pos.line}})`);
+		// we do want only cached times:
+		if (data.cachedTimes && line < data.cachedTimes.length) {
+			const toRet = data.cachedTimes[line];
+			if (data.timeAdjustMs) {
+				return new Date(toRet.valueOf() + data.timeAdjustMs);
+			} else {
+				return toRet;
+			}
+		}
+		// we trigger it
+		console.log(`smart-log.provideTimeByDataSync(cachedTimes=${data.cachedTimes?.length}), pos.line=${line}}) not in cache!`);
+		this.provideTimeByData(data, line);
+		// but return instantly an undefined
+		return undefined;
 	}
 
 	async provideTimeByData(data: DataPerDocument, line: number): Promise<Date> {
@@ -525,16 +577,18 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		if (data) {
 			// todo do binary search (difficulty === doesnt work >= and prev line <)
 			for (let i = 0; i < data.doc.lineCount; ++i) {
-				const lineTime = this.provideTime(data.doc, new vscode.Position(i, 0));
-				if (lineTime.valueOf() >= date.valueOf()) {
-					if (lineTime.valueOf() === date.valueOf()) {
-						return new vscode.Position(i, 0);
-					}
-					// if > return the prev. line.
-					if (i > 0) {
-						return new vscode.Position(i - 1, 0);
-					} else {
-						return undefined;
+				const lineTime: Date | undefined = this.provideTimeByDataSync(data, i);
+				if (lineTime !== undefined) {
+					if (lineTime.valueOf() >= date.valueOf()) {
+						if (lineTime.valueOf() === date.valueOf()) {
+							return new vscode.Position(i, 0);
+						}
+						// if > return the prev. line.
+						if (i > 0) {
+							return new vscode.Position(i - 1, 0);
+						} else {
+							return undefined;
+						}
 					}
 				}
 			}
@@ -558,9 +612,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		}
 	}
 
-    /*
-     * decorations support
-     */
+	/*
+	 * decorations support
+	 */
 	async updateData(data: DataPerDocument) {
 		console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()})...`);
 		const doc = data.doc;
@@ -699,6 +753,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				// we fire here the event as well to update the tree:
 				this._onDidChangeTreeData.fire();
 
+				// start generating the cache here:
+				this.provideTimeByData(data, data.doc.lineCount - 1);
+
 			});
 
 
@@ -784,6 +841,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			if (data.doc.uri.toString() !== ev.uri.toString()) {
 				if (ev.time.valueOf() > 0) {
 					console.log(` trying to reveal ${ev.time.toLocaleTimeString()} at doc ${data.doc.uri.toString()}`);
+					// store the last received time to be able to us this for the adjustTime command as reference:
+					data.lastSelectedTimeEv = ev.time;
+
 					let position = this.providePositionCloseTo(data.doc, ev.time);
 					if (position && data.textEditors) {
 						const posRange = new vscode.Range(position, position);
@@ -823,18 +883,23 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 							}
 						}
 					}
+					let didTimeAdjust = false;
 					if (adjustTimeBy.length) {
 						const minAdjust = Math.min(...adjustTimeBy);
 						const maxAdjust = Math.max(...adjustTimeBy);
 						const avgAdjust = adjustTimeBy.reduce((a, b) => a + b, 0) / adjustTimeBy.length;
 						console.log(`have ${adjustTimeBy.length} time adjustments with min=${minAdjust}, max=${maxAdjust}, avg=${avgAdjust} ms.`);
-						// todo: do adjust...
+						if (Math.abs(avgAdjust) > 100) {
+							data.gotTimeSyncEvents = true;
+							this.adjustTime(data, avgAdjust);
+							didTimeAdjust = true;
+						}
+
 					}
-					if (reBroadcastEvents.length) {
+					if (!didTimeAdjust && reBroadcastEvents.length) {
 						console.log(`re-broadcasting ${reBroadcastEvents.length} time syncs via onDidChangeSelectedTime`);
 						this._onDidChangeSelectedTime.fire({ time: new Date(0), uri: data.doc.uri, timeSyncs: reBroadcastEvents });
 					}
-
 				}
 			}
 		});

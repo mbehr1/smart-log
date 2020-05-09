@@ -61,3 +61,29 @@ export const throttle = <F extends (...args: any[]) => any>(func: F, waitFor: nu
         });
 };
 
+/* uri handling
+ we need to create proper URIs that
+  - contain a valid scheme
+  - show a good name as document (on open)
+  - can contain arbitrary parameters
+  */
+
+export function createUri(scheme: string, docName: string, args: any): vscode.Uri {
+    // we encode the args object as base64
+    const buff = Buffer.from(JSON.stringify(args));
+    return vscode.Uri.parse(`${scheme}:${docName}?a=${buff.toString('base64')}`);
+}
+export function unparseUri(uri: vscode.Uri): { scheme: string, docName: string, args: any } {
+    const buff = Buffer.from(uri.query.slice(2), 'base64');
+    const args = JSON.parse(buff.toString());
+    const obj = { scheme: uri.scheme, docName: uri.path, args: args };
+    return obj;
+}
+
+let _nextUniqueId: number = 1;
+export function createUniqueId(): string {
+    const toRet = `sl_${_nextUniqueId}`; // _nextUniqueId.toString();
+    _nextUniqueId++;
+    return toRet;
+}
+

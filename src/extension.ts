@@ -8,6 +8,8 @@ import * as path from 'path';
 import TelemetryReporter from 'vscode-extension-telemetry';
 import * as d3 from 'd3-time-format';
 
+const textScheme: string = 'smart-log';
+
 let reporter: TelemetryReporter;
 
 const smartLogLanguageId: string = "smart-log";
@@ -67,10 +69,12 @@ export function deactivate() {
 }
 
 export interface EventNode {
+	id: string;
 	label: string;
 	uri: vscode.Uri | null; // line provided as fragment #<line>
 	parent: EventNode | null;
 	children: EventNode[];
+	contextValue?: string;
 };
 
 interface DataPerDocument {
@@ -87,7 +91,7 @@ interface DataPerDocument {
 	gotTimeSyncEvents: boolean; // we've synced at least once to our time based on timeSync events
 	timeSyncs: Array<[number, TimeSyncData]>; // line, TimeSyncData here without time but line number
 };
-export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vscode.Disposable {
+export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vscode.TextDocumentContentProvider, vscode.Disposable {
 	private _subscriptions: Array<vscode.Disposable> = new Array<vscode.Disposable>();
 	private _didChangeSelectedTimeSubscriptions: Array<vscode.Disposable> = new Array<vscode.Disposable>();
 	private _documents = new Map<string, DataPerDocument>();
@@ -109,6 +113,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 	private _onDidChangeTreeData: vscode.EventEmitter<EventNode | null> = new vscode.EventEmitter<EventNode | null>();
 	readonly onDidChangeTreeData: vscode.Event<EventNode | null> = this._onDidChangeTreeData.event;
+	private lastSelectedNode: EventNode | null = null;
 
 	private _onDidChangeSelectedTime: vscode.EventEmitter<SelectedTimeData> = new vscode.EventEmitter<SelectedTimeData>();
 	readonly onDidChangeSelectedTime: vscode.Event<SelectedTimeData> = this._onDidChangeSelectedTime.event;
@@ -216,6 +221,38 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				console.log(`onDidChangeTextDocument data.doc.lineCount=${data.doc.lineCount}`);
 				data.cachedTimes = undefined;
 				this.updateData(data);
+			}
+		}));
+
+		// provide text docs from e.g. events:
+		this._subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(textScheme, this));
+		this._subscriptions.push(vscode.commands.registerCommand("smart-log.openAsTextDoc", (...args) => {
+			const node = <EventNode>args[0];
+			if (node) {
+				console.log(`smart-log.openAsTextDoc called with node='${node.label}' and uri='${node.uri?.toString()}'`);
+				if (node.uri) {
+					const uri = util.createUri(textScheme, `events ${node.label}`, { uri: node.uri, nodeId: node.id });
+					console.log(`smart-log.openAsTextDoc  calling uri='${uri.toString()}'`);
+					vscode.commands.executeCommand('vscode.open', uri, { preview: false });
+				}
+			}
+		}));
+		this._subscriptions.push(vscode.commands.registerCommand("smart-log.openAsTextDiff", (...args) => {
+			const node = <EventNode>args[0];
+			if (node) {
+				console.log(`smart-log.openAsTextDoc called with node='${node.label}' and uri='${node.uri?.toString()}'`);
+				// check whether that node is the active selection as well. if not we do diff:
+				if (this._smartLogTreeView && this._smartLogTreeView.selection.length > 0) {
+					const selectedNode = this._smartLogTreeView?.selection[0]; // could use lastSelectedNode
+					if (selectedNode !== node) {
+						// let's diff
+						console.log(`smart-log.openAsTextDiff doing a diff from selected node='${selectedNode?.label}' to node '${node.label}'`);
+						const uri1 = util.createUri(textScheme, `events ${selectedNode.label}`, { uri: selectedNode.uri, nodeId: selectedNode.id });
+						const uri2 = util.createUri(textScheme, `events ${node.label}`, { uri: node.uri, nodeId: node.id });
+						vscode.commands.executeCommand('vscode.diff', uri1, uri2, `events '${selectedNode.label}'<->'${node.label}'`, { preview: false });
+						return;
+					}
+				}
 			}
 		}));
 
@@ -372,6 +409,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 	addTextDocument(doc: vscode.TextDocument) {
 		console.log(`smart-log.addTextDocument languageId=${doc.languageId} uri.scheme=${doc.uri.scheme} uri=${doc.uri.toString()}`);
+		if (doc.uri.scheme === textScheme) { return; } // we ignore our internal scheme
 		if (this._documents.has(doc.uri.toString())) {
 			console.log("smart-log.addTextDocument we do have this doc already. Ignoring!");
 		} else {
@@ -406,22 +444,42 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						treeDataProvider: this
 					});
 					this._subscriptions.push(this._smartLogTreeView.onDidChangeSelection(event => {
-						console.log(`smartLogTreeView.onDidChangeSelection(${event.selection.length} ${event.selection[0].uri})`);
-						if (event.selection.length && event.selection[0].uri && event.selection[0].uri.fragment.length > 0) {
-							// find the editor for this uri in active docs:
-							let uriWoFrag = event.selection[0].uri.with({ fragment: "" }).toString();
-							const activeTextEditors = vscode.window.visibleTextEditors;
-							// console.log(`smartLogTreeView.onDidChangeSelection. finding editor for ${uriWoFrag}, activeTextEditors=${activeTextEditors.length}`);
-							for (let ind = 0; ind < activeTextEditors.length; ++ind) {
-								const editor = activeTextEditors[ind];
-								const editorUri = editor.document.uri.toString();
-								// console.log(` comparing with ${editorUri}`);
-								if (editor && uriWoFrag === editorUri) {
-									console.log(`  revealing ${event.selection[0].uri} line ${+(event.selection[0].uri.fragment)}`);
-									editor.revealRange(new vscode.Range(+(event.selection[0].uri.fragment), 0, +(event.selection[0].uri.fragment) + 1, 0), vscode.TextEditorRevealType.AtTop);
+						console.log(`smartLogTreeView.onDidChangeSelection(${event.selection.length} ${event.selection[0].uri}) ${event.selection[0].id}`);
+						if (event.selection.length && event.selection[0].uri) {
+							// we mark the last selected one. its a bit sad but I didn't found a when clause for it.
+							if (this.lastSelectedNode !== null) {
+								this.lastSelectedNode.contextValue = undefined;
+								const toUnselect = this.lastSelectedNode;
+								console.log(`smartLogTreeView.onDidChangeSelection unselecting ${this.lastSelectedNode.id} ${this.lastSelectedNode.contextValue}`);
+								// strangely this must be sent async otherwise duplicated ids get reported??? (weird vscode behaviour)
+								setTimeout(() => {
+									//console.log(`smartLogTreeView.onDidChangeSelection unselecting ${toUnselect.id} ${toUnselect.contextValue}`);
+									this._onDidChangeTreeData.fire(toUnselect);
+								}, 50);
+							}
+							this.lastSelectedNode = event.selection[0];
+							this.lastSelectedNode.contextValue = "selected";
+							const toSelect = this.lastSelectedNode;
+							setTimeout(() => {
+								//console.log(`smartLogTreeView.onDidChangeSelection selecting ${toSelect.id} ${toSelect.contextValue}`);
+								this._onDidChangeTreeData.fire(toSelect);
+							}, 50);
+
+							if (event.selection[0].uri.fragment.length > 0) {
+								// find the editor for this uri in active docs:
+								let uriWoFrag = event.selection[0].uri.with({ fragment: "" }).toString();
+								const activeTextEditors = vscode.window.visibleTextEditors;
+								// console.log(`smartLogTreeView.onDidChangeSelection. finding editor for ${uriWoFrag}, activeTextEditors=${activeTextEditors.length}`);
+								for (let ind = 0; ind < activeTextEditors.length; ++ind) {
+									const editor = activeTextEditors[ind];
+									const editorUri = editor.document.uri.toString();
+									// console.log(` comparing with ${editorUri}`);
+									if (editor && uriWoFrag === editorUri) {
+										console.log(`  revealing ${event.selection[0].uri} line ${+(event.selection[0].uri.fragment)}`);
+										editor.revealRange(new vscode.Range(+(event.selection[0].uri.fragment), 0, +(event.selection[0].uri.fragment) + 1, 0), vscode.TextEditorRevealType.AtTop);
+									}
 								}
 							}
-
 						}
 					}));
 				}
@@ -678,7 +736,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 			console.log(` identifiedFileConfig ${identifiedFileConfig.name} matches with ${rEvents.length}!`);
 
-			let eventRoot: EventNode = { label: `${identifiedFileConfig.name}:${path.basename(doc.uri.fsPath)}`, uri: doc.uri, parent: null, children: [] };
+			let eventRoot: EventNode = { id: util.createUniqueId(), label: `${identifiedFileConfig.name}:${path.basename(doc.uri.fsPath)}`, uri: doc.uri, parent: null, children: [] };
 			let decorations = new Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]>();
 
 			function getParent(level: number): EventNode {
@@ -688,7 +746,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					const parent = getParent(level - 1);
 					if (parent.children.length === 0) {
 						// create a dummy and return that one:
-						parent.children.push({ label: `(no parent level ${level - 1} event)`, uri: doc.uri, parent: parent, children: [] }); // todo add line number?
+						parent.children.push({ id: util.createUniqueId(), label: `(no parent level ${level - 1} event)`, uri: doc.uri, parent: parent, children: [] }); // todo add line number?
 					}
 					return parent.children[parent.children.length - 1];
 				}
@@ -716,7 +774,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 									let label: string = ev.label ? util.stringFormat(ev.label, match) : `${match[0]}`;
 									if (ev.level > 0) {
 										const parentNode = getParent(ev.level);
-										parentNode.children.push({ label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [] });
+										parentNode.children.push({ id: util.createUniqueId(), label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [] });
 									}
 									if (ev.decorationId) {
 										if (this._decorationTypes.has(ev.decorationId)) {
@@ -754,6 +812,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				this.updateDecorations(data);
 				// we fire here the event as well to update the tree:
 				this._onDidChangeTreeData.fire();
+				this._onDidChangeTreeData.fire(data.eventTreeNode);
 				if (doReveal) { this._smartLogTreeView?.reveal(data.eventTreeNode, { select: false, focus: false, expand: false }); }
 
 				// start generating the cache here:
@@ -808,8 +867,10 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 	public getTreeItem(element: EventNode): vscode.TreeItem {
 		// console.log(`smart-log.getTreeItem(${element.label}, ${element.uri?.toString()}) called.`);
 		return {
+			id: element.id,
 			label: element.label.length ? element.label : "<no events>",
 			collapsibleState: element.children.length ? vscode.TreeItemCollapsibleState.Collapsed : void 0,
+			contextValue: element.contextValue,
 			iconPath: /* (element.children.length === 0 && element.label.startsWith("xy")) ? path.join(__filename, '..', '..', 'media', 'root-folder.svg') : */ undefined // todo!
 		};
 	}
@@ -933,4 +994,74 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		console.log(`smart-log.checkActiveExtensions: got ${this._didChangeSelectedTimeSubscriptions.length} subscriptions.`);
 	}
 
+	// provide text docs fom event tree:
+	provideTextDocumentContent(uri: vscode.Uri): string {
+		const parts = util.unparseUri(uri);
+		console.log(`got args=${JSON.stringify(parts.args)}`);
+		console.log(`got args.uri=${JSON.stringify(parts.args.uri)}`);
+
+		let nodeUri = vscode.Uri.parse(parts.args.uri.external).with({
+			scheme: parts.args.uri.scheme,
+			query: parts.args.uri.query,
+			path: parts.args.uri.path,
+			fragment: parts.args.uri.fragment,
+			authority: parts.args.uri.authority
+
+		});
+
+		// do we know this doc?
+		const data = this._documents.get(nodeUri.with({ fragment: '' }).toString());
+		if (data) {
+
+			if (data.eventTreeNode) {
+
+				// determine start node by nodeId:
+				const nodeId = parts.args.nodeId;
+				let startNode: EventNode | undefined = data.eventTreeNode;
+				if (nodeId) {
+					startNode = findNodeById(startNode, nodeId);
+				}
+				if (startNode) {
+					console.log(`iterateDepth startNode: ${startNode.label}`);
+					let toRet: string = `${startNode.uri?.fsPath}${(startNode !== data.eventTreeNode) ? ` for event '${startNode.label}'` : ''}\n`;
+					iterateDepth(startNode, (node, relLevel): boolean => {
+						try {
+							toRet += '\t'.repeat(relLevel);
+							toRet += `${node.label}\n`;
+						} catch (err) {
+							console.log(`iterateDepth got err '${err}' at node: ${node.label}`);
+						}
+						return false;
+					});
+					return toRet;
+				} else {
+					return `start event not found for uri=${nodeUri.toString()} nodeId=${nodeId}`;
+				}
+			} else {
+				return `no events from uri=${nodeUri.toString()}`;
+			}
+		} else {
+			return `unknown doc from uri=${nodeUri.toString()}`;
+		}
+	}
+
+}
+
+function iterateDepth(startNode: EventNode, func: ((node: EventNode, relLevel: number) => boolean), startLevel: number = 0): EventNode | undefined {
+
+	if (func(startNode, startLevel)) { return startNode; }
+
+	for (let i = 0; i < startNode.children.length; ++i) {
+		const child = startNode.children[i];
+		const retChild = iterateDepth(child, func, startLevel + 1);
+		if (retChild !== undefined) { return retChild; }
+	}
+	return undefined;
+}
+
+function findNodeById(startNode: EventNode, id: string): EventNode | undefined {
+	return iterateDepth(startNode, (node: EventNode): boolean => {
+		if (node.id === id) { return true; }
+		return false;
+	});
 }

@@ -2,7 +2,7 @@
 	"name": "smart-log",
 	"displayName": "Smart-Log",
 	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "1.6.0",
+	"version": "1.7.0",
 	"license": "CC BY-NC-SA 4.0",
 	"publisher": "mbehr1",
 	"author": {
@@ -226,6 +226,16 @@
 				"command": "smart-log.toggleTimeSync",
 				"title": "toggle auto time sync",
 				"icon": "$(sync-ignored)"
+			},
+			{
+				"command": "smart-log.openAsTextDoc",
+				"title": "open as text document",
+				"icon": "$(file)"
+			},
+			{
+				"command": "smart-log.openAsTextDiff",
+				"title": "open as diff to selected",
+				"icon": "$(diff)"
 			}
 		],
 		"menus": {
@@ -247,6 +257,18 @@
 					"alt": "smart-log.sendTimeSyncEvents",
 					"when": "editorLangId == smart-log",
 					"group": "navigation"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "smart-log.openAsTextDiff",
+					"when": "view == smartLogEventsExplorer && viewItem != selected",
+					"group": "inline"
+				},
+				{
+					"command": "smart-log.openAsTextDoc",
+					"when": "view == smartLogEventsExplorer && viewItem == selected",
+					"group": "inline"
 				}
 			]
 		},

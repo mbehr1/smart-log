@@ -1,14 +1,14 @@
 # Smart-Log README
 
-[![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.smart-log.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.smart-log)
+[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/mbehr1.smart-log?color=green&label=smart-log&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=mbehr1.smart-log)
 
 This Visual Studio Code(tm) extension adds **analysis** and **visualization** features for log files and should ease debugging especially of complex systems where multiple log files need to be considered at the same time.
 
 ![Smart-Log in action](https://github.com/mbehr1/smart-log/raw/master/images/smart-log_1.gif)
 
-**Note:** It works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.vsc-lfs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.vsc-lfs) to handle large log files (few hundred MBs).
+**Note:** It works well with [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/mbehr1.vsc-lfs?color=green&label=vsc-lfs&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=mbehr1.vsc-lfs) to handle large log files (few hundred MBs).
 
-**Note:** The **time-sync** feature works well with [![Version](https://vsmarketplacebadge.apphb.com/version/mbehr1.dlt-logs.svg)](https://marketplace.visualstudio.com/items?itemName=mbehr1.dlt-logs) for DLT (diagnostic log and trace) files.
+**Note:** The **time-sync** feature works well with [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/mbehr1.dlt-logs?color=green&label=dlt-logs&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=mbehr1.dlt-logs) for DLT (diagnostic log and trace) and [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/mbehr1.vsc-webshark?color=green&label=vsc-webshark&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=mbehr1.vsc-webshark) for pcap/pcapng-network trace files.
 
 
 ## Features
@@ -16,6 +16,8 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
 - Configurable **event tree-view** (todo picture):
   - Helps quickly to understand the structure or to highlight events (errors/warnings,...).
   - Quickly jump to the event by selecting the item in the tree-view.
+  - Open a text document with the full set of events or the selected event and its leaves.
+  - Compare two tree events quickly (select/click one tree event and then click on the diff icon on the 2nd event)
 - Configurable **decorations** (todo picture).
 - **Time sync** feature (todo movie...):
   - Detects time for each line.
@@ -24,6 +26,8 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
   - Posts events of the selected time to other documents/plugins. (See ... <todo>).
   - Allows to "synchronize" this time with other visible documents from all plugins that support "onDidChangeSelectedTime" events. 
   - **Automatic time synchronization of multiple documents** by "time-sync events" (see settings event.timeSyncId and event.timeSyncPrio) (todo add example).
+
+  **Note:** **Time sync** is restricted to documents within the same workspace/editor window and revealing line works if used with multiple columns/rows (so the documents must be visible).
 
 - Allows configuration of **multiple file types** (see settings smart-log.fileConfigs).
 
@@ -54,6 +58,7 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 
 ## Planned features
 
+* Add possibility to select from which other documents time events should be considered.
 * Use outline instead of own tree view
 * add filtering based on events (remove all but the events)
 * automatic timezone detection

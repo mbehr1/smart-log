@@ -407,7 +407,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					});
 					this._subscriptions.push(this._smartLogTreeView.onDidChangeSelection(event => {
 						console.log(`smartLogTreeView.onDidChangeSelection(${event.selection.length} ${event.selection[0].uri})`);
-						if (event.selection.length && event.selection[0].uri) {
+						if (event.selection.length && event.selection[0].uri && event.selection[0].uri.fragment.length > 0) {
 							// find the editor for this uri in active docs:
 							let uriWoFrag = event.selection[0].uri.with({ fragment: "" }).toString();
 							const activeTextEditors = vscode.window.visibleTextEditors;
@@ -424,7 +424,6 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 						}
 					}));
-					this._smartLogTreeView.reveal({ label: "", uri: null, parent: null, children: [] });
 				}
 			}
 		}
@@ -679,7 +678,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 			console.log(` identifiedFileConfig ${identifiedFileConfig.name} matches with ${rEvents.length}!`);
 
-			let eventRoot: EventNode = { label: identifiedFileConfig.name, uri: doc.uri, parent: null, children: [] };
+			let eventRoot: EventNode = { label: `${identifiedFileConfig.name}:${path.basename(doc.uri.fsPath)}`, uri: doc.uri, parent: null, children: [] };
 			let decorations = new Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]>();
 
 			function getParent(level: number): EventNode {
@@ -741,6 +740,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				} catch (error) {
 					console.log(`error: ${error} occurred!`);
 				}
+				const doReveal = !data.eventTreeNode;
 				data.eventTreeNode = eventRoot;
 
 				data.decorations = new Array<[vscode.TextEditorDecorationType, Array<vscode.DecorationOptions>]>();
@@ -754,6 +754,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				this.updateDecorations(data);
 				// we fire here the event as well to update the tree:
 				this._onDidChangeTreeData.fire();
+				if (doReveal) { this._smartLogTreeView?.reveal(data.eventTreeNode, { select: false, focus: false, expand: false }); }
 
 				// start generating the cache here:
 				this.provideTimeByData(data, data.doc.lineCount - 1);
@@ -815,18 +816,10 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 	public getChildren(element?: EventNode): EventNode[] | Thenable<EventNode[]> {
 		// console.log(`smart-log.getChildren(${element?.label}, ${element?.uri?.toString()}) this=${this} called.`);
-		if (!element) { // if no element we have to return the root element.
-			// check whether we have a EventNode for the current document:
-			const doc = vscode.window.activeTextEditor?.document;
-			if (doc && this) {
-				const node = this._documents.get(doc.uri.toString())?.eventTreeNode;
-				if (node) {
-					// console.log(` eventTreeNode for doc ${doc.uri.toString()} found`);
-					return [node];
-				}
-				console.log(` no eventTreeNode for doc ${doc.uri.toString()} available`);
-			}
-			return [{ label: "", uri: null, parent: null, children: [] }];
+		if (!element) { // if no element we have to return the root elements.
+			let nodeArray: EventNode[] = [];
+			this._documents.forEach((data) => { if (data.eventTreeNode) { nodeArray.push(data.eventTreeNode); } });
+			return nodeArray;
 		} else {
 			return element.children;
 		}

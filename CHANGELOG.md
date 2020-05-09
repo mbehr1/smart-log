@@ -4,6 +4,9 @@ All notable changes to the "smart-log" extension will be documented in this file
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
+## [1.6.0]
+- Events explorer shows events for all open documents as preparation to compare/diff event trees.
+
 ## [1.5.1]
 - change the checkActiveExtensions impl. Debounce a bit.
 

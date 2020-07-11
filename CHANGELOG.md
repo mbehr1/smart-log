@@ -4,6 +4,9 @@ All notable changes to the "smart-log" extension will be documented in this file
 
 <!-- Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file. -->
 
+## [1.8.0]
+- Check for each file config where identifyRegex matches the text whether it can parse times for at least 50 out of the first 100 lines. If not choose the file config that matches best.
+
 ## [1.7.0]
 - Add "open as text document" and "open as diff to selected" button to the events explorer to quickly export the events into a text document or directly diff two event-trees.
 

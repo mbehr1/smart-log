@@ -33,8 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const extension = vscode.extensions.getExtension(extensionId);
 
 	if (extension) {
-		const extensionVersion = extension.packageJSON.extensionVersion;
-
+		const extensionVersion = extension.packageJSON.version;
 		// the aik is not really sec_ret. but lets avoid bo_ts finding it too easy:
 		const strKE = 'ZjJlMDA4NTQtNmU5NC00ZDVlLTkxNDAtOGFiNmIzNTllODBi';
 		const strK = Buffer.from(strKE, "base64").toString();
@@ -86,6 +85,7 @@ interface DataPerDocument {
 	cachedTimes?: Array<Date>; // per line one date/time
 	timeRegex?: RegExp; // from file config or default
 	timeFormat?: string;
+	d3TimeParser?: any;
 	timeAdjustMs?: number; // adjust in ms
 	lastSelectedTimeEv: Date | undefined; // the last received time event that might have been used to reveal our line. used for adjustTime on last event feature.
 	gotTimeSyncEvents: boolean; // we've synced at least once to our time based on timeSync events
@@ -136,6 +136,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 					data.identifiedFileConfig = undefined; // reset here to let config changes apply
 					data.timeRegex = undefined;
 					data.timeFormat = undefined;
+					data.d3TimeParser = undefined;
 					data.cachedTimes = undefined;
 					this.updateData(data);
 				});
@@ -561,10 +562,6 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 			return vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, cancellable: true }, async (progress, cancelToken): Promise<Date> => {
 
-				let d3TimeParser = null;
-				if (data.timeFormat) {
-					d3TimeParser = d3.timeParse(data.timeFormat);
-				}
 
 				let cachedTimes = new Array<Date>();
 
@@ -585,31 +582,11 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 							startTime = process.hrtime();
 						}
 					}
-					let curLine = data.doc.lineAt(i).text;
-					let regRes = curLine.match(data.timeRegex!);
-					if (regRes) {
-						if (regRes.length >= 7) {
-							let year = +regRes[1];
-							if (year < 100) { year += 2000; }
-							const ms: number = regRes[7] ? +regRes[7] : 0;
-							let date = new Date(year, +regRes[2] - 1, +regRes[3], +regRes[4], +regRes[5], +regRes[6], ms);
-							cachedTimes.push(date);
-						} else if (regRes.length === 2) { // one complete date string
-							let date: Date | null = null;
-							if (d3TimeParser) {
-								try {
-									const parsedTime = d3TimeParser(regRes[1]);
-									// console.log(`got parsedTime ${parsedTime}`);
-									date = <Date>parsedTime;
-								} catch (error) {
-									console.log(`got error ${error}`);
-								}
-							} else {
-								date = new Date(regRes[1]);
-							}
-							cachedTimes.push(date ? date : new Date(0));
-						}
-					} else {
+					let curDate = this.parseDateForLine(data, i);
+					if (curDate !== undefined) {
+						cachedTimes.push(curDate);
+					}
+					else {
 						// use the one from prev. line
 						if (i > 0) {
 							cachedTimes.push(cachedTimes[i - 1]);
@@ -628,6 +605,36 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				}
 			});
 		}
+	}
+
+	public parseDateForLine(data: DataPerDocument, line: number): Date | undefined {
+		// assumes that data.timeRegex and data.d3TimeParser is set accordingly
+		let curLine = data.doc.lineAt(line).text;
+		let regRes = curLine.match(data.timeRegex!);
+		if (regRes) {
+			if (regRes.length >= 7) {
+				let year = +regRes[1];
+				if (year < 100) { year += 2000; }
+				const ms: number = regRes[7] ? +regRes[7] : 0;
+				let date = new Date(year, +regRes[2] - 1, +regRes[3], +regRes[4], +regRes[5], +regRes[6], ms);
+				return date;
+			} else if (regRes.length === 2) { // one complete date string
+				let date: Date | null = null;
+				if (data.d3TimeParser !== undefined) {
+					try {
+						const parsedTime = data.d3TimeParser(regRes[1]);
+						// console.log(`got parsedTime ${parsedTime}`);
+						date = <Date>parsedTime;
+					} catch (error) {
+						console.log(`got error ${error}`);
+					}
+				} else {
+					date = new Date(regRes[1]);
+				}
+				return date ? date : undefined;
+			}
+		}
+		return undefined;
 	}
 
 	public providePositionCloseTo(doc: vscode.TextDocument, date: Date): vscode.Position | undefined {
@@ -685,6 +692,8 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		let identifiedFileConfig: any | undefined = data.identifiedFileConfig;
 		if (!identifiedFileConfig) {
 			if (this._fileConfigs) {
+				let matchAccurracy = -1;
+				const nrLines = doc.lineCount > 100 ? 100 : doc.lineCount;
 				for (let i = 0; i < this._fileConfigs.length; ++i) {
 					const fileConfig: any = this._fileConfigs[i];
 					try {
@@ -694,9 +703,25 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 						if (name && identifyRegexStr) {
 							const identifyRegex: RegExp = new RegExp(identifyRegexStr);
 							if (identifyRegex.exec(doc.getText())) {
-								console.log(` fileConfig ${name} matches!`);
-								identifiedFileConfig = fileConfig;
-								break;
+								//console.log(` fileConfig ${name} matches!`);
+								// have to set timeRegex and timeFormat and d3TimeParser already here for parseDateForLine
+								data.timeRegex = ("timeRegex" in fileConfig) ? new RegExp(<string>fileConfig.timeRegex) : this._timeRegex;
+								data.timeFormat = ("timeFormat" in fileConfig) ? fileConfig.timeFormat : this._timeFormat;
+								data.d3TimeParser = data.timeFormat ? d3.timeParse(data.timeFormat) : undefined;
+								// lets see how accurate it matches by determining how many
+								// times we can get from the first 100 lines:
+								let linesWithDate = 0;
+								for (let l = 0; l < nrLines; ++l) {
+									if (this.parseDateForLine(data, l) !== undefined) { linesWithDate++; }
+								}
+								console.log(` fileConfig ${name} matches with accurracy=${linesWithDate}`);
+								if (linesWithDate > matchAccurracy) {
+									identifiedFileConfig = fileConfig;
+									matchAccurracy = linesWithDate;
+								}
+								if (matchAccurracy > 50) { // good enough, lets keep this
+									break;
+								}
 							}
 						}
 					} catch (error) {
@@ -709,18 +734,10 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 		data.timeSyncs = []; // reset them here.
 
 		if (identifiedFileConfig) {
-
-			if ("timeRegex" in identifiedFileConfig) {
-				data.timeRegex = new RegExp(<string>identifiedFileConfig.timeRegex);
-			} else {
-				console.log(" using default timeRegex");
-				data.timeRegex = this._timeRegex;
-			}
-			if ("timeFormat" in identifiedFileConfig) {
-				data.timeFormat = identifiedFileConfig.timeFormat;
-			} else {
-				data.timeFormat = this._timeFormat;
-			}
+			// need to reset here as above the not most accurate match might be checked...
+			data.timeRegex = ("timeRegex" in identifiedFileConfig) ? new RegExp(<string>identifiedFileConfig.timeRegex) : this._timeRegex;
+			data.timeFormat = ("timeFormat" in identifiedFileConfig) ? identifiedFileConfig.timeFormat : this._timeFormat;
+			data.d3TimeParser = data.timeFormat ? d3.timeParse(data.timeFormat) : undefined;
 
 			const events: any | undefined = identifiedFileConfig.events;
 			// create the RegExps here to have them compiled and not created line by line
@@ -734,7 +751,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 				}
 			}
 
-			console.log(` identifiedFileConfig ${identifiedFileConfig.name} matches with ${rEvents.length}!`);
+			console.log(` identifiedFileConfig ${identifiedFileConfig.name} matches with ${rEvents.length} events`);
 
 			let eventRoot: EventNode = { id: util.createUniqueId(), label: `${identifiedFileConfig.name}:${path.basename(doc.uri.fsPath)}`, uri: doc.uri, parent: null, children: [] };
 			let decorations = new Map<vscode.TextEditorDecorationType, vscode.DecorationOptions[]>();

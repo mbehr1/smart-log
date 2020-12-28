@@ -74,6 +74,7 @@ export interface EventNode {
 	parent: EventNode | null;
 	children: EventNode[];
 	contextValue?: string;
+	icon?: vscode.ThemeIcon;
 };
 
 interface DataPerDocument {
@@ -741,12 +742,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
 			const events: any | undefined = identifiedFileConfig.events;
 			// create the RegExps here to have them compiled and not created line by line
-			let rEvents = new Array<{ regex: RegExp, label: string, level: number, decorationId?: string, timeSyncId?: string, timeSyncPrio?: number }>();
+			let rEvents = new Array<{ regex: RegExp, label: string, level: number, decorationId?: string, timeSyncId?: string, timeSyncPrio?: number, icon?: vscode.ThemeIcon }>();
 			if (events) {
 				for (let i = 0; i < events.length; ++i) {
 					const event: any | undefined = events[i];
-					if (event.regex) { // level, label and decorationId are optional
-						rEvents.push({ regex: new RegExp(event.regex), label: event.label, level: event.level ? event.level : 0, decorationId: event.decorationId, timeSyncId: event.timeSyncId, timeSyncPrio: event.timeSyncPrio });
+					if (event.regex) { // level, label, icon and decorationId are optional
+						rEvents.push({ regex: new RegExp(event.regex), label: event.label, level: event.level ? event.level : 0, decorationId: event.decorationId, timeSyncId: event.timeSyncId, timeSyncPrio: event.timeSyncPrio, icon: event.icon ? new vscode.ThemeIcon(event.icon) : undefined });
 					}
 				}
 			}
@@ -791,7 +792,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 									let label: string = ev.label ? util.stringFormat(ev.label, match) : `${match[0]}`;
 									if (ev.level > 0) {
 										const parentNode = getParent(ev.level);
-										parentNode.children.push({ id: util.createUniqueId(), label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [] });
+										parentNode.children.push({ id: util.createUniqueId(), label: label, uri: doc.uri.with({ fragment: `${line.lineNumber}` }), parent: parentNode, children: [], icon: ev.icon });
 									}
 									if (ev.decorationId) {
 										if (this._decorationTypes.has(ev.decorationId)) {
@@ -888,7 +889,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 			label: element.label.length ? element.label : "<no events>",
 			collapsibleState: element.children.length ? vscode.TreeItemCollapsibleState.Collapsed : void 0,
 			contextValue: element.contextValue,
-			iconPath: /* (element.children.length === 0 && element.label.startsWith("xy")) ? path.join(__filename, '..', '..', 'media', 'root-folder.svg') : */ undefined // todo!
+			iconPath: element.icon
 		};
 	}
 

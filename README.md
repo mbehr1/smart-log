@@ -15,9 +15,13 @@ This Visual Studio Code(tm) extension adds **analysis** and **visualization** fe
 
 - Configurable **event tree-view** (todo picture):
   - Helps quickly to understand the structure or to highlight events (errors/warnings,...).
+  - Icons can be added to the tree-view.
   - Quickly jump to the event by selecting the item in the tree-view.
   - Open a text document with the full set of events or the selected event and its leaves.
   - Compare two tree events quickly (select/click one tree event and then click on the diff icon on the 2nd event)
+
+![Icons in tree-view](https://github.com/mbehr1/smart-log/raw/master/images/smart-log_tree-view_1.png)
+
 - Configurable **decorations** (todo picture).
 - **Time sync** feature (todo movie...):
   - Detects time for each line.

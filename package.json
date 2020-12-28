@@ -149,6 +149,10 @@
 												"type": "string",
 												"description": "Identifier of the decoration to use. Defaults to none."
 											},
+											"icon": {
+												"type": "string",
+												"description": "Optional name of a codicon icon. E.g. warning or bug. See https://microsoft.github.io/vscode-codicons/dist/codicon.html for a full list."
+											},
 											"timeSyncId": {
 												"type": "string",
 												"description": "Optional identifier of a 'time sync event'. This gets broadcasted to other documents with the time and the last regex capture in lower case as value."
@@ -179,7 +183,8 @@
 										"level": 2,
 										"label": "{2} {1}",
 										"decorationId": "warning",
-										"regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (4[0-9]{2}) "
+										"regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (4[0-9]{2}) ",
+										"icon": "warning"
 									}
 								]
 							},

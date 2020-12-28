@@ -70,7 +70,6 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 * automatic timezone detection
 * change "smart-log" file type automatically to sub-types
 * change file type back to e.g. Log or Plain text if no config is found.
-* add event icon support in tree view
 * add event support to modify parent title
 * add decoration for time-sync
 

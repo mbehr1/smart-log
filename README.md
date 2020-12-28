@@ -56,6 +56,8 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 
 [![Donations](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=2ZNMJP5P43QQN&source=url) are welcome! (Contact me for commercial use or different [license](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode)).
 
+[GitHub ♥︎ Sponsors are welcome!](https://github.com/sponsors/mbehr1)
+
 ## Planned features
 
 * Add possibility to select from which other documents time events should be considered.
@@ -71,6 +73,9 @@ Open an [issue](https://github.com/mbehr1/smart-log/issues) or create a pull req
 ## Release Notes
 
 See [Changelog](./CHANGELOG.md)
+
+[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
+![release](https://github.com/mbehr1/smart-log/workflows/Semantic%20Release%20and%20Publish/badge.svg)
 
 ## Third-party Content
 

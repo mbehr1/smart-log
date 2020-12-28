@@ -1,5 +1,12 @@
 # Change log for 'smart-log':
 
+## [1.9.0](https://github.com/mbehr1/smart-log/compare/v1.8.1...v1.9.0) (2020-12-28)
+
+
+### Features
+
+* **tree-view:** add icon support ([5149b4d](https://github.com/mbehr1/smart-log/commit/5149b4dc57962da400e76e962ca861dce59a954a))
+
 ### [1.8.1]
 - Update dependencies after github security advisory
 

@@ -1,5 +1,12 @@
 # Change log for 'smart-log':
 
+## [1.10.0](https://github.com/mbehr1/smart-log/compare/v1.9.0...v1.10.0) (2021-05-13)
+
+
+### Features
+
+* limit support in untrusted workspaces ([43a1c99](https://github.com/mbehr1/smart-log/commit/43a1c99df92222d879434e1c233f92ac158170f6))
+
 ## [1.9.0](https://github.com/mbehr1/smart-log/compare/v1.8.1...v1.9.0) (2020-12-28)
 
 

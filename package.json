@@ -25,6 +25,16 @@
 	"activationEvents": [
 		"*"
 	],
+	"capabilities": {
+		"untrustedWorkspaces": {
+			"supported": "limited",
+			"description": "Regex and file configs need to come from a trusted workspace as they can potentially cause harm.",
+			"restrictedConfigurations": [
+				"smart-log.timeRegex",
+				"smart-log.fileConfigs"
+			]
+		}
+	},
 	"main": "./out/extension.js",
 	"contributes": {
 		"configuration": [

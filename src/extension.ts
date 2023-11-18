@@ -48,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const extVscLfs = vscode.extensions.getExtension('mbehr1.vsc-lfs');
 	if (!extVscLfs) {
 		vscode.window.showInformationMessage(
-			'You do not seem to have the "large file" extension installed. So you might not be able to load text files >50MB. Consider installing extension "vsc-lsf".'
+			'You do not seem to have the "large file" extension installed. So you might not be able to load text files >50MB. Consider installing extension "vsc-lfs".'
 		);
 	}
 

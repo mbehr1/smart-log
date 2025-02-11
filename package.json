@@ -1,417 +1,463 @@
 {
-	"name": "smart-log",
-	"displayName": "Smart-Log",
-	"description": "Provides analysis and visualization features for text based log files.",
-	"version": "1.10.0",
-	"license": "CC-BY-NC-SA-4.0",
-	"publisher": "mbehr1",
-	"author": {
-		"name": "Matthias Behr",
-		"email": "mbehr+smartlog@mcbehr.de"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/mbehr1/smart-log.git"
-	},
-	"bugs": {
-		"url": "https://github.com/mbehr1/smart-log/issues"
-	},
-	"engines": {
-		"vscode": "^1.43.0"
-	},
-	"categories": [
-		"Other"
-	],
-	"activationEvents": [
-		"*"
-	],
-	"capabilities": {
-		"untrustedWorkspaces": {
-			"supported": "limited",
-			"description": "Regex and file configs need to come from a trusted workspace as they can potentially cause harm.",
-			"restrictedConfigurations": [
-				"smart-log.timeRegex",
-				"smart-log.fileConfigs"
-			]
-		}
-	},
-	"main": "./out/extension.js",
-	"contributes": {
-		"configuration": [
-			{
-				"title": "Smart-Log",
-				"properties": {
-					"smart-log.timeRegex": {
-						"type": "string",
-						"description": "Regular expression used to identify the time for a line of the logs. This can be overwritten by timeRegex setting inside each fileConfig. Needs to have at least 6 captures (year, month, date, hour, min, sec) can have a 7th (ms) or only 1 capture (time string that Date() accepts).",
-						"default": "^([0-2][0-9]|[0-2][0-9][0-9][0-9])\\-([0-1][0-9])\\-([0-3][0-9]) ([0-2][0-9])\\:([0-5][0-9])\\:([0-5][0-9]),([0-9][0-9][0-9])"
-					},
-					"smart-log.timeFormat": {
-						"type": "string",
-						"description": "Optional time format specifier (details see d3-time-format). If this is provided the timeRegex has to capture one expression that will be parsed according to this specifier. Example '%d/%b/%Y:%H:%M:%S %Z'. If not provided the default Date() constructor will be used."
-					},
-					"smart-log.decorations": {
-						"type": "array",
-						"items": {
-							"type": "object",
-							"title": "decoration",
-							"properties": {
-								"id": {
-									"type": "string",
-									"description": "Identifier of this decoration for later reference e.g. in events."
-								},
-								"renderOptions": {
-									"type": "object",
-									"description": "Render options see vs code API DecorationRenderOptions."
-								}
-							}
-						},
-						"default": [
-							{
-								"id": "error",
-								"renderOptions": {
-									"borderWidth": "1px",
-									"borderStyle": "solid",
-									"overviewRulerColor": "red",
-									"overviewRulerLane": 7,
-									"light": {
-										"borderColor": "red"
-									},
-									"dark": {
-										"borderColor": "red"
-									}
-								}
-							},
-							{
-								"id": "warning",
-								"renderOptions": {
-									"borderWidth": "1px",
-									"borderStyle": "dotted",
-									"overviewRulerColor": "orange",
-									"overviewRulerLane": 4,
-									"light": {
-										"borderColor": "orange"
-									},
-									"dark": {
-										"borderColor": "orange"
-									}
-								}
-							},
-							{
-								"id": "note",
-								"renderOptions": {
-									"borderWidth": "1px",
-									"borderStyle": "dotted",
-									"overviewRulerColor": "blue",
-									"overviewRulerLane": 1,
-									"light": {
-										"borderColor": "blue"
-									},
-									"dark": {
-										"borderColor": "blue"
-									}
-								}
-							}
-						]
-					},
-					"smart-log.fileConfigs": {
-						"type": "array",
-						"items": {
-							"type": "object",
-							"title": "fileConfig",
-							"properties": {
-								"name": {
-									"type": "string",
-									"description": "Name to identify the type of file."
-								},
-								"identifyRegex": {
-									"type": "string",
-									"description": "Regexp to identify this file type. Will be searched in full document. The first matching file type is used."
-								},
-								"timeRegex": {
-									"type": "string",
-									"description": "Regexp used to identify the time for a line of the logs. If provided it overwrittes the smart-log.timeRegex setting."
-								},
-								"timeFormat": {
-									"type": "string",
-									"description": "Optional time format specifier (details see d3-time-format). If this is provided the timeRegex has to capture one expression that will be parsed according to this specifier. Example '%d/%b/%Y:%H:%M:%S %Z'. If not provided the default Date() constructor will be used."
-								},
-								"events": {
-									"type": "array",
-									"items": {
-										"type": "object",
-										"title": "eventConfig",
-										"properties": {
-											"regex": {
-												"type": "string",
-												"description": "Regexp to identify this event. Events are searched line by line."
-											},
-											"label": {
-												"type": "string",
-												"description": "Label of this event. Can contain {x} format expressions that are replaced by regex x.th captured regex match[x]. If empty defaults to the match[0]"
-											},
-											"level": {
-												"type": "integer",
-												"description": "Indent level (1-based) of this event. Level 1 events are the upmost ones. Level 0 wont be added to tree-view but can be used for decorations.",
-												"default": 0
-											},
-											"decorationId": {
-												"type": "string",
-												"description": "Identifier of the decoration to use. Defaults to none."
-											},
-											"icon": {
-												"type": "string",
-												"description": "Optional name of a codicon icon. E.g. warning or bug. See https://microsoft.github.io/vscode-codicons/dist/codicon.html for a full list."
-											},
-											"timeSyncId": {
-												"type": "string",
-												"description": "Optional identifier of a 'time sync event'. This gets broadcasted to other documents with the time and the last regex capture in lower case as value."
-											},
-											"timeSyncPrio": {
-												"type": "integer",
-												"description": "Optional (needed if timeSyncId is used) priority of the time-sync event. As two documents exchange their events by this prio they decide on who will adjust the time. The event with the highest prio (lowest number) will be used."
-											}
-										}
-									}
-								}
-							}
-						},
-						"default": [
-							{
-								"name": "common log format",
-								"identifyRegex": "HTTP/",
-								"timeRegex": "^\\S+ \\S+ \\S+ \\[([^\\]]+)",
-								"timeFormat": "%d/%b/%Y:%H:%M:%S %Z",
-								"events": [
-									{
-										"level": 1,
-										"label": "error {2} {1}",
-										"decorationId": "error",
-										"regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (5[0-9]{2}) "
-									},
-									{
-										"level": 2,
-										"label": "{2} {1}",
-										"decorationId": "warning",
-										"regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (4[0-9]{2}) ",
-										"icon": "warning"
-									}
-								]
-							},
-							{
-								"name": "syslog",
-								"identifyRegex": "\\s(.*)\\[(\\d*)\\]:",
-								"timeRegex": "^(.*\\s[0-2][0-9]\\:[0-5][0-9]\\:[0-9][0-9])\\s",
-								"events": [
-									{
-										"label": "error",
-										"regex": "error",
-										"decorationId": "error"
-									},
-									{
-										"label": "root: {1}",
-										"level": 1,
-										"regex": "\\(root\\)(.*)",
-										"decorationId": "warning"
-									}
-								]
-							}
-						],
-						"description": "File specific configurations. For details see (todo)"
-					}
-				}
-			}
-		],
-		"commands": [
-			{
-				"command": "smart-log.adjustTime",
-				"title": "adjust time..."
-			},
-			{
-				"command": "smart-log.sendTime",
-				"title": "send selected time",
-				"icon": "$(sync)"
-			},
-			{
-				"command": "smart-log.sendTimeSyncEvents",
-				"title": "send detected time sync events",
-				"icon": "$(sync)"
-			},
-			{
-				"command": "smart-log.toggleTimeSync",
-				"title": "toggle auto time sync",
-				"icon": "$(sync-ignored)"
-			},
-			{
-				"command": "smart-log.openAsTextDoc",
-				"title": "open as text document",
-				"icon": "$(file)"
-			},
-			{
-				"command": "smart-log.openAsTextDiff",
-				"title": "open as diff to selected",
-				"icon": "$(diff)"
-			}
-		],
-		"menus": {
-			"editor/context": [
-				{
-					"group": "1_modification",
-					"command": "smart-log.adjustTime",
-					"when": "editorLangId == smart-log"
-				},
-				{
-					"group": "0_navigation",
-					"command": "smart-log.sendTime",
-					"when": "editorLangId == smart-log"
-				}
-			],
-			"editor/title": [
-				{
-					"command": "smart-log.toggleTimeSync",
-					"alt": "smart-log.sendTimeSyncEvents",
-					"when": "editorLangId == smart-log",
-					"group": "navigation"
-				}
-			],
-			"view/item/context": [
-				{
-					"command": "smart-log.openAsTextDiff",
-					"when": "view == smartLogEventsExplorer && viewItem != selected",
-					"group": "inline"
-				},
-				{
-					"command": "smart-log.openAsTextDoc",
-					"when": "view == smartLogEventsExplorer && viewItem == selected",
-					"group": "inline"
-				}
-			]
-		},
-		"languages": [
-			{
-				"id": "smart-log",
-				"extensions": [
-					".log",
-					".txt"
-				]
-			}
-		],
-		"viewsContainers": {
-			"activitybar": [
-				{
-					"id": "mbehr1Logs",
-					"title": "Logs (smart-/dlt-logs)",
-					"icon": "./media/logs.svg"
-				}
-			]
-		},
-		"views": {
-			"mbehr1Logs": [
-				{
-					"id": "smartLogEventsExplorer",
-					"name": "events explorer"
-				}
-			]
-		}
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
-		"lint": "eslint src --ext ts",
-		"watch": "tsc -watch -p ./",
-		"pretest": "npm run compile && npm run lint",
-		"test": "node ./out/test/runTest.js"
-	},
-	"devDependencies": {
-		"@commitlint/cli": "^11.0.0",
-		"@commitlint/config-conventional": "^11.0.0",
-		"@semantic-release/changelog": "^5.0.1",
-		"@semantic-release/git": "^9.0.0",
-		"@types/glob": "^7.1.3",
-		"@types/mocha": "^7.0.1",
-		"@types/node": "^12.12.50",
-		"@types/vscode": "1.43.0",
-		"@typescript-eslint/eslint-plugin": "^2.34.0",
-		"@typescript-eslint/parser": "^2.34.0",
-		"eslint": "^6.8.0",
-		"glob": "^7.1.6",
-		"husky": "^4.3.6",
-		"mocha": "^7.2.0",
-		"semantic-release": "^17.3.0",
-		"semantic-release-vsce": "^3.0.1",
-		"typescript": "^3.9.7",
-		"vscode-test": "^1.4.0"
-	},
-	"dependencies": {
-		"@types/d3-time-format": "^2.1.1",
-		"d3-time-format": "^2.2.3",
-		"vscode-extension-telemetry": "^0.1.6"
-	},
-	"commitlint": {
-		"extends": [
-			"@commitlint/config-conventional"
-		]
-	},
-	"husky": {
-		"hooks": {
-			"commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
-		}
-	},
-	"release": {
-		"branches": [
-			"master"
-		],
-		"plugins": [
-			[
-				"@semantic-release/commit-analyzer",
-				{
-					"releaseRules": [
-						{
-							"type": "docs",
-							"scope": "readme",
-							"release": "patch"
-						}
-					]
-				}
-			],
-			"@semantic-release/release-notes-generator",
-			[
-				"@semantic-release/changelog",
-				{
-					"changelogFile": "CHANGELOG.md",
-					"changelogTitle": "# Change log for 'smart-log':"
-				}
-			],
-			[
-				"@semantic-release/npm",
-				{
-					"npmPublish": false
-				}
-			],
-			[
-				"semantic-release-vsce",
-				{
-					"packageVsix": "smart-log.vsix"
-				}
-			],
-			[
-				"@semantic-release/github",
-				{
-					"assets": [
-						{
-							"path": "smart-log.vsix",
-							"label": "smart-log Visual Studio Code extension package"
-						}
-					]
-				}
-			],
-			[
-				"@semantic-release/git",
-				{
-					"message": "chore(release): ${nextRelease.version} [skip ci]"
-				}
-			]
-		],
-		"preset": "conventionalcommits"
-	}
+  "name": "smart-log",
+  "displayName": "Smart-Log",
+  "description": "Provides analysis and visualization features for text based log files.",
+  "version": "1.10.0",
+  "license": "CC-BY-NC-SA-4.0",
+  "publisher": "mbehr1",
+  "author": {
+    "name": "Matthias Behr",
+    "email": "mbehr+smartlog@mcbehr.de"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mbehr1/smart-log.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mbehr1/smart-log/issues"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Regex and file configs need to come from a trusted workspace as they can potentially cause harm.",
+      "restrictedConfigurations": [
+        "smart-log.timeRegex",
+        "smart-log.fileConfigs"
+      ]
+    }
+  },
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": [
+      {
+        "title": "Smart-Log",
+        "properties": {
+          "smart-log.timeRegex": {
+            "type": "string",
+            "description": "Regular expression used to identify the time for a line of the logs. This can be overwritten by timeRegex setting inside each fileConfig. Needs to have at least 6 captures (year, month, date, hour, min, sec) can have a 7th (ms) or only 1 capture (time string that Date() accepts).",
+            "default": "^([0-2][0-9]|[0-2][0-9][0-9][0-9])\\-([0-1][0-9])\\-([0-3][0-9]) ([0-2][0-9])\\:([0-5][0-9])\\:([0-5][0-9]),([0-9][0-9][0-9])"
+          },
+          "smart-log.timeFormat": {
+            "type": "string",
+            "description": "Optional time format specifier (details see d3-time-format). If this is provided the timeRegex has to capture one expression that will be parsed according to this specifier. Example '%d/%b/%Y:%H:%M:%S %Z'. If not provided the default Date() constructor will be used."
+          },
+          "smart-log.decorations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "title": "decoration",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Identifier of this decoration for later reference e.g. in events."
+                },
+                "renderOptions": {
+                  "type": "object",
+                  "description": "Render options see vs code API DecorationRenderOptions."
+                }
+              }
+            },
+            "default": [
+              {
+                "id": "error",
+                "renderOptions": {
+                  "borderWidth": "1px",
+                  "borderStyle": "solid",
+                  "overviewRulerColor": "red",
+                  "overviewRulerLane": 7,
+                  "light": {
+                    "borderColor": "red"
+                  },
+                  "dark": {
+                    "borderColor": "red"
+                  }
+                }
+              },
+              {
+                "id": "warning",
+                "renderOptions": {
+                  "borderWidth": "1px",
+                  "borderStyle": "dotted",
+                  "overviewRulerColor": "orange",
+                  "overviewRulerLane": 4,
+                  "light": {
+                    "borderColor": "orange"
+                  },
+                  "dark": {
+                    "borderColor": "orange"
+                  }
+                }
+              },
+              {
+                "id": "note",
+                "renderOptions": {
+                  "borderWidth": "1px",
+                  "borderStyle": "dotted",
+                  "overviewRulerColor": "blue",
+                  "overviewRulerLane": 1,
+                  "light": {
+                    "borderColor": "blue"
+                  },
+                  "dark": {
+                    "borderColor": "blue"
+                  }
+                }
+              }
+            ]
+          },
+          "smart-log.fileConfigs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "title": "fileConfig",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name to identify the type of file."
+                },
+                "identifyRegex": {
+                  "type": "string",
+                  "description": "Regexp to identify this file type. Will be searched in full document. The first matching file type is used."
+                },
+                "timeRegex": {
+                  "type": "string",
+                  "description": "Regexp used to identify the time for a line of the logs. If provided it overwrittes the smart-log.timeRegex setting."
+                },
+                "timeFormat": {
+                  "type": "string",
+                  "description": "Optional time format specifier (details see d3-time-format). If this is provided the timeRegex has to capture one expression that will be parsed according to this specifier. Example '%d/%b/%Y:%H:%M:%S %Z'. If not provided the default Date() constructor will be used."
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "title": "eventConfig",
+                    "properties": {
+                      "regex": {
+                        "type": "string",
+                        "description": "Regexp to identify this event. Events are searched line by line."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Label of this event. Can contain {x} format expressions that are replaced by regex x.th captured regex match[x]. If empty defaults to the match[0]"
+                      },
+                      "level": {
+                        "type": "integer",
+                        "description": "Indent level (1-based) of this event. Level 1 events are the upmost ones. Level 0 wont be added to tree-view but can be used for decorations.",
+                        "default": 0
+                      },
+                      "decorationId": {
+                        "type": "string",
+                        "description": "Identifier of the decoration to use. Defaults to none."
+                      },
+                      "icon": {
+                        "type": "string",
+                        "description": "Optional name of a codicon icon. E.g. warning or bug. See https://microsoft.github.io/vscode-codicons/dist/codicon.html for a full list."
+                      },
+                      "timeSyncId": {
+                        "type": "string",
+                        "description": "Optional identifier of a 'time sync event'. This gets broadcasted to other documents with the time and the last regex capture in lower case as value."
+                      },
+                      "timeSyncPrio": {
+                        "type": "integer",
+                        "description": "Optional (needed if timeSyncId is used) priority of the time-sync event. As two documents exchange their events by this prio they decide on who will adjust the time. The event with the highest prio (lowest number) will be used."
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "default": [
+              {
+                "name": "common log format",
+                "identifyRegex": "HTTP/",
+                "timeRegex": "^\\S+ \\S+ \\S+ \\[([^\\]]+)",
+                "timeFormat": "%d/%b/%Y:%H:%M:%S %Z",
+                "events": [
+                  {
+                    "level": 1,
+                    "label": "error {2} {1}",
+                    "decorationId": "error",
+                    "regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (5[0-9]{2}) "
+                  },
+                  {
+                    "level": 2,
+                    "label": "{2} {1}",
+                    "decorationId": "warning",
+                    "regex": "^\\S+ \\S+ \\S+ \\[[^\\]]+\\] \"([A-Z]+ [^ \"]+? HTTP/[0-9.]+)\" (4[0-9]{2}) ",
+                    "icon": "warning"
+                  }
+                ]
+              },
+              {
+                "name": "syslog",
+                "identifyRegex": "\\s(.*)\\[(\\d*)\\]:",
+                "timeRegex": "^(.*\\s[0-2][0-9]\\:[0-5][0-9]\\:[0-9][0-9])\\s",
+                "events": [
+                  {
+                    "label": "error",
+                    "regex": "error",
+                    "decorationId": "error"
+                  },
+                  {
+                    "label": "root: {1}",
+                    "level": 1,
+                    "regex": "\\(root\\)(.*)",
+                    "decorationId": "warning"
+                  }
+                ]
+              }
+            ],
+            "description": "File specific configurations. For details see (todo)"
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "smart-log.adjustTime",
+        "title": "adjust time..."
+      },
+      {
+        "command": "smart-log.sendTime",
+        "title": "send selected time",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "smart-log.sendTimeSyncEvents",
+        "title": "send detected time sync events",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "smart-log.toggleTimeSync",
+        "title": "toggle auto time sync",
+        "icon": "$(sync-ignored)"
+      },
+      {
+        "command": "smart-log.openAsTextDoc",
+        "title": "open as text document",
+        "icon": "$(file)"
+      },
+      {
+        "command": "smart-log.openAsTextDiff",
+        "title": "open as diff to selected",
+        "icon": "$(diff)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "group": "1_modification",
+          "command": "smart-log.adjustTime",
+          "when": "editorLangId == smart-log"
+        },
+        {
+          "group": "0_navigation",
+          "command": "smart-log.sendTime",
+          "when": "editorLangId == smart-log"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "smart-log.toggleTimeSync",
+          "alt": "smart-log.sendTimeSyncEvents",
+          "when": "editorLangId == smart-log",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "smart-log.openAsTextDiff",
+          "when": "view == smartLogEventsExplorer && viewItem != selected",
+          "group": "inline"
+        },
+        {
+          "command": "smart-log.openAsTextDoc",
+          "when": "view == smartLogEventsExplorer && viewItem == selected",
+          "group": "inline"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "smart-log",
+        "extensions": [
+          ".log",
+          ".txt"
+        ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mbehr1Logs",
+          "title": "Logs (smart-/dlt-logs)",
+          "icon": "./media/logs.svg"
+        }
+      ]
+    },
+    "views": {
+      "mbehr1Logs": [
+        {
+          "id": "smartLogEventsExplorer",
+          "name": "events explorer"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "prepare": "husky install",
+    "vscode:prepublish": "npm run compile",
+    "compile": "npm run check-types && node esbuild.mjs",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext ts",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.mjs --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && node esbuild.mjs --production",
+    "pretest": "npm run compile && npm run lint",
+    "test": "tsc --project tsconfig_test.json && node ./out/test/test/runTest.js"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.7.1",
+    "@commitlint/config-conventional": "^19.7.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "^20.17.11",
+    "@types/vscode": "1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.3",
+    "@typescript-eslint/parser": "^6.7.3",
+    "esbuild": "^0.24.0",
+    "eslint": "^8.50.0",
+    "glob": "^11.0.1",
+    "husky": "^8.0.1",
+    "mocha": "^10.0.0",
+    "semantic-release": "^24.2.0",
+    "semantic-release-vsce": "^6.0.5",
+    "typescript": "^5.7.2",
+    "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "@types/d3-time-format": "^2.1.1",
+    "d3-time-format": "^2.2.3",
+    "@vscode/extension-telemetry": "^0.9.8"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "release": {
+    "branches": [
+      "master"
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "releaseRules": [
+            {
+              "type": "docs",
+              "scope": "readme",
+              "release": "patch"
+            }
+          ]
+        }
+      ],
+      [
+        "@semantic-release/release-notes-generator",
+        {
+          "preset": "conventionalcommits",
+          "presetConfig": {
+            "types": [
+              {
+                "type": "feat",
+                "section": "Features"
+              },
+              {
+                "type": "fix",
+                "section": "Bug Fixes"
+              },
+              {
+                "type": "chore",
+                "hidden": true
+              },
+              {
+                "type": "docs",
+                "hidden": true
+              },
+              {
+                "type": "style",
+                "section": "Other",
+                "hidden": false
+              },
+              {
+                "type": "test",
+                "hidden": true
+              },
+              {
+                "type": "perf",
+                "section": "Performance",
+                "hidden": false
+              },
+              {
+                "type": "refactor",
+                "section": "Other",
+                "hidden": false
+              }
+            ]
+          }
+        }
+      ],
+      [
+        "@semantic-release/changelog",
+        {
+          "changelogFile": "CHANGELOG.md",
+          "changelogTitle": "# Change log for 'smart-log':"
+        }
+      ],
+      [
+        "@semantic-release/npm",
+        {
+          "npmPublish": false
+        }
+      ],
+      [
+        "semantic-release-vsce",
+        {
+          "packageVsix": "fishbone.vsix"
+        }
+      ],
+      [
+        "@semantic-release/github",
+        {
+          "assets": [
+            {
+              "path": "smart-log.vsix",
+              "label": "Fishbone Visual Studio Code extension package"
+            }
+          ],
+          "successComment": false,
+          "failTitle": false
+        }
+      ],
+      [
+        "@semantic-release/git",
+        {
+          "message": "chore(release): ${nextRelease.version} [skip ci]"
+        }
+      ]
+    ],
+    "preset": "conventionalcommits"
+  }
 }

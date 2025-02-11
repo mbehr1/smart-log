@@ -435,7 +435,7 @@
       [
         "semantic-release-vsce",
         {
-          "packageVsix": "fishbone.vsix"
+          "packageVsix": "smart-log.vsix"
         }
       ],
       [
@@ -444,7 +444,7 @@
           "assets": [
             {
               "path": "smart-log.vsix",
-              "label": "Fishbone Visual Studio Code extension package"
+              "label": "Smart-Log Visual Studio Code extension package"
             }
           ],
           "successComment": false,

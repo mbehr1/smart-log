@@ -1,5 +1,12 @@
 # Change log for 'smart-log':
 
+## [1.10.1](https://github.com/mbehr1/smart-log/compare/v1.10.0...v1.10.1) (2025-02-11)
+
+### Bug Fixes
+
+* remove plenty of unneeded console logs ([da8fd01](https://github.com/mbehr1/smart-log/commit/da8fd014feba4eb3543a2160559262b8345e1a88))
+* typo vsc-lfs ([dc10368](https://github.com/mbehr1/smart-log/commit/dc103689374a4950caeeb3acffd4ae431f3d3412))
+
 ## [1.10.0](https://github.com/mbehr1/smart-log/compare/v1.9.0...v1.10.0) (2021-05-13)
 
 

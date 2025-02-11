@@ -125,7 +125,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
   readonly onDidChangeSelectedTime: vscode.Event<SelectedTimeData> = this._onDidChangeSelectedTime.event;
 
   constructor() {
-    console.log(`smart-log() #fileConfigs=${this._fileConfigs?.length}`);
+    //console.log(`smart-log() #fileConfigs=${this._fileConfigs?.length}`);
 
     // register for configuration changes:
     this._subscriptions.push(
@@ -182,7 +182,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
 
     // initial check for open documents:
     vscode.workspace.textDocuments.forEach(async (value) => {
-      console.log(`smart-log: checking already opened textDocument ${value.uri.toString()}`);
+      // console.log(`smart-log: checking already opened textDocument ${value.uri.toString()}`);
       this.addTextDocument(value);
     });
 
@@ -191,9 +191,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
       vscode.window.onDidChangeActiveTextEditor(async (event: vscode.TextEditor | undefined) => {
         let activeTextEditor = event;
         if (activeTextEditor) {
-          console.log(
+          /*console.log(
             `smart-log.onDidChangeActiveTextEditor ${activeTextEditor.document.uri.toString()} column=${activeTextEditor.viewColumn}`
-          );
+          );*/
 
           if (this._documents.has(activeTextEditor.document.uri.toString())) {
             const data = this._documents.get(activeTextEditor.document.uri.toString())!;
@@ -225,9 +225,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
                 const time: Date = await this.provideTimeByData(data, line);
                 // post time update...
                 if (time.valueOf() > 0) {
-                  console.log(
+                  /*console.log(
                     ` smart-log posting time update ${time.toLocaleTimeString()}.${String(time.valueOf() % 1000).padStart(3, '0')}`
-                  );
+                  );*/
                   this._onDidChangeSelectedTime.fire({ time: time, uri: data.doc.uri });
                 }
               }
@@ -242,7 +242,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
       vscode.workspace.onDidChangeTextDocument((event) => {
         let data = this._documents.get(event.document.uri.toString());
         if (data) {
-          console.log(`onDidChangeTextDocument data.doc.lineCount=${data.doc.lineCount}`);
+          // console.log(`onDidChangeTextDocument data.doc.lineCount=${data.doc.lineCount}`);
           data.cachedTimes = undefined;
           this.updateData(data);
         }
@@ -258,7 +258,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
           console.log(`smart-log.openAsTextDoc called with node='${node.label}' and uri='${node.uri?.toString()}'`);
           if (node.uri) {
             const uri = util.createUri(textScheme, `events ${node.label}`, { uri: node.uri, nodeId: node.id });
-            console.log(`smart-log.openAsTextDoc  calling uri='${uri.toString()}'`);
+            // console.log(`smart-log.openAsTextDoc  calling uri='${uri.toString()}'`);
             vscode.commands.executeCommand('vscode.open', uri, { preview: false });
           }
         }
@@ -388,7 +388,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
     // we do have to connect to ourself as well (in case of multiple smart-logs docs)
     this._subscriptions.push(
       vscode.extensions.onDidChange(() => {
-        console.log(`smart-log.extensions.onDidChange #ext=${vscode.extensions.all.length}`);
+        // console.log(`smart-log.extensions.onDidChange #ext=${vscode.extensions.all.length}`);
         setTimeout(() => {
           this.checkActiveExtensions();
         }, 1500); // let the new ext. start first. This introduces a race for auto-time-sync events.todo
@@ -400,7 +400,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
   }
 
   dispose() {
-    console.log('smart-logs.dispose()');
+    // console.log('smart-logs.dispose()');
     this._documents.clear(); // todo have to dispose more? check in detail...
     if (this._smartLogTreeView) {
       this._smartLogTreeView.dispose();
@@ -453,7 +453,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
         try {
           const conf: any = decorationConfigs[i];
           if (conf.id) {
-            console.log(` adding decoration id=${conf.id}`);
+            // console.log(` adding decoration id=${conf.id}`);
             this._decorationTypes.set(
               conf.id,
               vscode.window.createTextEditorDecorationType(<vscode.DecorationRenderOptions>conf.renderOptions)
@@ -468,12 +468,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
   }
 
   addTextDocument(doc: vscode.TextDocument) {
-    console.log(`smart-log.addTextDocument languageId=${doc.languageId} uri.scheme=${doc.uri.scheme} uri=${doc.uri.toString()}`);
+    // console.log(`smart-log.addTextDocument languageId=${doc.languageId} uri.scheme=${doc.uri.scheme} uri=${doc.uri.toString()}`);
     if (doc.uri.scheme === textScheme) {
       return;
     } // we ignore our internal scheme
     if (this._documents.has(doc.uri.toString())) {
-      console.log('smart-log.addTextDocument we do have this doc already. Ignoring!');
+      // console.log('smart-log.addTextDocument we do have this doc already. Ignoring!');
     } else {
       // shall we change the languageId? (todo document feature and add config settings)
       if (this._rewriteLanguageIds.has(doc.languageId)) {
@@ -508,17 +508,17 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
           });
           this._subscriptions.push(
             this._smartLogTreeView.onDidChangeSelection((event) => {
-              console.log(
+              /*console.log(
                 `smartLogTreeView.onDidChangeSelection(${event.selection.length} ${event.selection[0].uri}) ${event.selection[0].id}`
-              );
+              );*/
               if (event.selection.length && event.selection[0].uri) {
                 // we mark the last selected one. its a bit sad but I didn't found a when clause for it.
                 if (this.lastSelectedNode !== null) {
                   this.lastSelectedNode.contextValue = undefined;
                   const toUnselect = this.lastSelectedNode;
-                  console.log(
+                  /*console.log(
                     `smartLogTreeView.onDidChangeSelection unselecting ${this.lastSelectedNode.id} ${this.lastSelectedNode.contextValue}`
-                  );
+                  );*/
                   // strangely this must be sent async otherwise duplicated ids get reported??? (weird vscode behaviour)
                   setTimeout(() => {
                     //console.log(`smartLogTreeView.onDidChangeSelection unselecting ${toUnselect.id} ${toUnselect.contextValue}`);
@@ -543,7 +543,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
                     const editorUri = editor.document.uri.toString();
                     // console.log(` comparing with ${editorUri}`);
                     if (editor && uriWoFrag === editorUri) {
-                      console.log(`  revealing ${event.selection[0].uri} line ${+event.selection[0].uri.fragment}`);
+                      // console.log(`  revealing ${event.selection[0].uri} line ${+event.selection[0].uri.fragment}`);
                       editor.revealRange(
                         new vscode.Range(+event.selection[0].uri.fragment, 0, +event.selection[0].uri.fragment + 1, 0),
                         vscode.TextEditorRevealType.AtTop
@@ -577,12 +577,12 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
     position: vscode.Position,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<vscode.DocumentHighlight[]> {
-    console.log(`smart-log.provideDocumentHighlights(doc=${doc.uri.toString()}pos=${position.line}:${position.character}`);
+    // console.log(`smart-log.provideDocumentHighlights(doc=${doc.uri.toString()}pos=${position.line}:${position.character}`);
     let data = this._documents.get(doc.uri.toString());
     if (data) {
       // todo
     } else {
-      console.log(' called for an unknown/unhandled document!');
+      // console.log(' called for an unknown/unhandled document!');
     }
     return null;
   }
@@ -593,7 +593,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
     if (data) {
       return this.provideTimeByData(data, pos.line);
     } else {
-      console.log('smart-log.provideTime called for an unknown/unhandled document!');
+      // console.log('smart-log.provideTime called for an unknown/unhandled document!');
     }
     return new Date(0);
   }
@@ -610,7 +610,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
       }
     }
     // we trigger it
-    console.log(`smart-log.provideTimeByDataSync(cachedTimes=${data.cachedTimes?.length}), pos.line=${line}}) not in cache!`);
+    // console.log(`smart-log.provideTimeByDataSync(cachedTimes=${data.cachedTimes?.length}), pos.line=${line}}) not in cache!`);
     this.provideTimeByData(data, line);
     // but return instantly an undefined
     return undefined;
@@ -630,9 +630,9 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
         return new Date(0);
       }
 
-      console.log(
+      /*console.log(
         `smart-log.provideTimeByData regenerating cachedTimes. line=${line}/${data.doc.lineCount} vs. cachedTimes.lines=${data.cachedTimes?.length}`
-      );
+      );*/
 
       // we reset the times here in any case:
       // there is a race cond here that this function gets called multiple times (as the function calls sleep...)
@@ -723,7 +723,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
   }
 
   public providePositionCloseTo(doc: vscode.TextDocument, date: Date): vscode.Position | undefined {
-    console.log(`smart-log.providePositionCloseTo(doc=${doc.uri.toString()}) :`, date);
+    // console.log(`smart-log.providePositionCloseTo(doc=${doc.uri.toString()}) :`, date);
     let data = this._documents.get(doc.uri.toString());
     if (data) {
       // todo do binary search (difficulty === doesnt work >= and prev line <)
@@ -745,7 +745,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
       }
       return undefined;
     } else {
-      console.log(' called for an unknown/unhandled document!');
+      // onsole.log(' called for an unknown/unhandled document!');
     }
     return undefined;
   }
@@ -758,7 +758,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
         const timeSyncEvent = data.timeSyncs[i];
         timeSyncs.push(timeSyncEvent[1]);
       }
-      console.log(`broadcasting ${timeSyncs.length} time syncs via onDidChangeSelectedTime`);
+      // console.log(`broadcasting ${timeSyncs.length} time syncs via onDidChangeSelectedTime`);
       this._onDidChangeSelectedTime.fire({ time: new Date(0), uri: data.doc.uri, timeSyncs: timeSyncs });
     }
   }
@@ -767,7 +767,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
    * decorations support
    */
   async updateData(data: DataPerDocument) {
-    console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()})...`);
+    // console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()})...`);
     const doc = data.doc;
     const text = doc.getText();
     let match;
@@ -784,7 +784,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
           try {
             const name: string = fileConfig.name;
             const identifyRegexStr: string = fileConfig.identifyRegex;
-            console.log(` checking fileConfig ${name} with identifyRegex ${identifyRegexStr}`);
+            // console.log(` checking fileConfig ${name} with identifyRegex ${identifyRegexStr}`);
             if (name && identifyRegexStr) {
               const identifyRegex: RegExp = new RegExp(identifyRegexStr);
               if (identifyRegex.exec(doc.getText())) {
@@ -801,7 +801,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
                     linesWithDate++;
                   }
                 }
-                console.log(` fileConfig ${name} matches with accurracy=${linesWithDate}`);
+                // console.log(` fileConfig ${name} matches with accurracy=${linesWithDate}`);
                 if (linesWithDate > matchAccurracy) {
                   identifiedFileConfig = fileConfig;
                   matchAccurracy = linesWithDate;
@@ -972,7 +972,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
         this.provideTimeByData(data, data.doc.lineCount - 1);
       });
     } else {
-      console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()}) has no data!`);
+      // console.log(`smart-log.updateData(document.uri=${data.doc.uri.toString()}) has no data!`);
       // no config
       data.eventTreeNode = undefined;
       data.decorations = undefined; // this won't delete the old ones! todo
@@ -1047,11 +1047,11 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
   }
 
   handleDidChangeSelectedTime(ev: SelectedTimeData) {
-    console.log(`smart-log.handleDidChangeSelectedTime got ev from uri=${ev.uri.toString()}`);
+    // console.log(`smart-log.handleDidChangeSelectedTime got ev from uri=${ev.uri.toString()}`);
     this._documents.forEach((data) => {
       if (data.doc.uri.toString() !== ev.uri.toString()) {
         if (ev.time.valueOf() > 0) {
-          console.log(` trying to reveal ${ev.time.toLocaleTimeString()} at doc ${data.doc.uri.toString()}`);
+          // console.log(` trying to reveal ${ev.time.toLocaleTimeString()} at doc ${data.doc.uri.toString()}`);
           // store the last received time to be able to us this for the adjustTime command as reference:
           data.lastSelectedTimeEv = ev.time;
 
@@ -1065,7 +1065,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
           }
         }
         if (ev.timeSyncs?.length && data.timeSyncs.length) {
-          console.log(` got ${ev.timeSyncs.length} timeSyncs from ${ev.uri.toString()}`);
+          // console.log(` got ${ev.timeSyncs.length} timeSyncs from ${ev.uri.toString()}`);
           // todo auto timesync...
           let adjustTimeBy: number[] = [];
           let reBroadcastEvents: TimeSyncData[] = [];
@@ -1113,7 +1113,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
             }
           }
           if (!didTimeAdjust && reBroadcastEvents.length) {
-            console.log(`re-broadcasting ${reBroadcastEvents.length} time syncs via onDidChangeSelectedTime`);
+            // console.log(`re-broadcasting ${reBroadcastEvents.length} time syncs via onDidChangeSelectedTime`);
             this._onDidChangeSelectedTime.fire({ time: new Date(0), uri: data.doc.uri, timeSyncs: reBroadcastEvents });
           }
         }
@@ -1141,24 +1141,24 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
               this.handleDidChangeSelectedTime(ev);
             });
             if (subscr !== undefined) {
-              console.log(`smart-log.got onDidChangeSelectedTime api from ${value.id}`);
+              // console.log(`smart-log.got onDidChangeSelectedTime api from ${value.id}`);
               newSubs.push(subscr);
             }
           }
         } catch (error) {
-          console.log(`smart-log:extension ${value.id} throws: ${error}`);
+          // console.log(`smart-log:extension ${value.id} throws: ${error}`);
         }
       }
     });
     this._didChangeSelectedTimeSubscriptions = newSubs;
-    console.log(`smart-log.checkActiveExtensions: got ${this._didChangeSelectedTimeSubscriptions.length} subscriptions.`);
+    // console.log(`smart-log.checkActiveExtensions: got ${this._didChangeSelectedTimeSubscriptions.length} subscriptions.`);
   }
 
   // provide text docs fom event tree:
   provideTextDocumentContent(uri: vscode.Uri): string {
     const parts = util.unparseUri(uri);
-    console.log(`got args=${JSON.stringify(parts.args)}`);
-    console.log(`got args.uri=${JSON.stringify(parts.args.uri)}`);
+    // console.log(`got args=${JSON.stringify(parts.args)}`);
+    // console.log(`got args.uri=${JSON.stringify(parts.args.uri)}`);
 
     let nodeUri = vscode.Uri.parse(parts.args.uri.external).with({
       scheme: parts.args.uri.scheme,
@@ -1179,7 +1179,7 @@ export default class SmartLogs implements vscode.TreeDataProvider<EventNode>, vs
           startNode = findNodeById(startNode, nodeId);
         }
         if (startNode) {
-          console.log(`iterateDepth startNode: ${startNode.label}`);
+          // console.log(`iterateDepth startNode: ${startNode.label}`);
           let toRet: string = `${startNode.uri?.fsPath}${startNode !== data.eventTreeNode ? ` for event '${startNode.label}'` : ''}\n`;
           iterateDepth(startNode, (node, relLevel): boolean => {
             try {
